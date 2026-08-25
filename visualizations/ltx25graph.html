@@ -1,0 +1,1692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>LTX 2.5 — Educational Data-Flow Map</title>
+<style>
+:root{
+  --bg:#0f1115; --panel:#171a20; --panel2:#1d212a; --line:#2a2f3a; --line2:#39404e;
+  --txt:#dfe4ec; --dim:#8b95a7; --dim2:#5d6779;
+  --acc:#4dd0e1; --acc2:#1f7a86;
+  --sel:#ffcc4d;
+  --k-input:#7c8798; --k-conv:#4f9cf9; --k-norm:#a78bfa; --k-act:#f59e0b;
+  --k-attn:#f472b6; --k-mlp:#34d399; --k-linear:#38bdf8; --k-add:#94a3b8;
+  --k-sample:#c084fc; --k-out:#22c55e; --k-ctrl:#fbbf24; --k-group:#5b6675;
+  --k-resample:#2dd4bf; --k-embed:#818cf8;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
+  font:13px/1.4 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit;color:inherit}
+#app{display:flex;flex-direction:column;height:100%}
+
+/* ---------- top bar ---------- */
+#top{display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--panel);
+  border-bottom:1px solid var(--line);flex:0 0 auto;overflow-x:auto;overflow-y:hidden;
+  scrollbar-width:none}
+#top::-webkit-scrollbar{display:none}
+.brand{display:flex;flex-direction:column;line-height:1.15;margin-right:4px;flex:0 0 auto}
+.brand b{font-size:12px;letter-spacing:.3px}
+.brand span{font-size:9.5px;color:var(--dim2);letter-spacing:.4px;text-transform:uppercase}
+.sep{width:1px;height:22px;background:var(--line2);flex:0 0 auto;margin:0 2px}
+.btn{background:var(--panel2);border:1px solid var(--line2);border-radius:5px;
+  padding:5px 9px;cursor:pointer;white-space:nowrap;flex:0 0 auto;font-size:12px}
+.btn:hover{background:#262c37;border-color:#4a5464}
+.btn:active{transform:translateY(1px)}
+.btn.on{background:var(--acc2);border-color:var(--acc);color:#e8fbff}
+.btn.icon{padding:5px 8px;font-size:13px}
+.seg{display:flex;flex:0 0 auto;border:1px solid var(--line2);border-radius:5px;overflow:hidden}
+.seg .btn{border:0;border-radius:0;border-right:1px solid var(--line2);padding:5px 8px}
+.seg .btn:last-child{border-right:0}
+.lbl{font-size:10px;color:var(--dim2);text-transform:uppercase;letter-spacing:.5px;
+  margin-right:2px;flex:0 0 auto}
+
+/* ---------- body ---------- */
+#body{flex:1;display:flex;min-height:0;position:relative}
+#outline{width:250px;flex:0 0 auto;background:var(--panel);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;min-height:0}
+#inspector{width:290px;flex:0 0 auto;background:var(--panel);border-left:1px solid var(--line);
+  display:flex;flex-direction:column;min-height:0}
+.pnlhd{padding:7px 10px;font-size:10px;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--dim2);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}
+.pnlhd .x{margin-left:auto;cursor:pointer;color:var(--dim);font-size:14px;display:none}
+.pnlbd{flex:1;overflow:auto;padding:6px 0}
+#outline.hide,#inspector.hide{display:none}
+
+/* outline tree */
+.tw{padding:2px 8px 2px 0;cursor:pointer;display:flex;align-items:center;gap:5px;
+  font-size:12px;white-space:nowrap}
+.tw:hover{background:#20252e}
+.tw.sel{background:#2b3444;box-shadow:inset 2px 0 0 var(--sel)}
+.tw .tg{width:13px;text-align:center;color:var(--dim2);font-size:9px;flex:0 0 auto}
+.tw .dot{width:7px;height:7px;border-radius:2px;flex:0 0 auto}
+.tw .nm{overflow:hidden;text-overflow:ellipsis}
+.tw .ct{color:var(--dim2);font-size:10px;margin-left:auto;padding-left:6px}
+
+/* inspector */
+.f{padding:6px 10px}
+.f label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;
+  color:var(--dim2);margin-bottom:3px}
+.f input,.f select,.f textarea{width:100%;background:#10131a;border:1px solid var(--line2);
+  border-radius:4px;padding:5px 7px;font-size:12px}
+.f input:focus,.f select:focus,.f textarea:focus{outline:none;border-color:var(--acc)}
+.f textarea{resize:vertical;min-height:52px}
+.f.row{display:flex;gap:8px}
+.f.row>div{flex:1}
+.hint{padding:10px;color:var(--dim2);font-size:11.5px;line-height:1.6}
+.hint b{color:var(--dim)}
+kbd{background:#10131a;border:1px solid var(--line2);border-bottom-width:2px;border-radius:3px;
+  padding:1px 4px;font:11px ui-monospace,Menlo,Consolas,monospace;color:var(--txt)}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.chips{display:flex;flex-wrap:wrap;gap:4px;padding:0 10px 8px}
+.chip{background:#10131a;border:1px solid var(--line2);border-radius:99px;padding:2px 8px;
+  font-size:11px;cursor:pointer;color:var(--dim)}
+.chip:hover{border-color:var(--acc);color:var(--txt)}
+.sources{display:flex;flex-direction:column;gap:6px;padding:0 10px 10px}
+.source{background:#10131a;border:1px solid var(--line2);border-radius:5px;padding:7px}
+.source .sl{font-size:11px;color:var(--txt);margin-bottom:3px}
+.source .sp{font:10px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--dim2);
+  word-break:break-all}
+.source .sa{display:flex;gap:5px;margin-top:6px}
+.source .sa .btn{padding:3px 7px;font-size:10.5px}
+.source .sa .btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ---------- canvas ---------- */
+#canvasWrap{flex:1;position:relative;min-width:0;overflow:hidden;background:
+  radial-gradient(circle at 50% 40%,#171b22 0%,#0d0f13 100%)}
+#svg{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+#svg text{-webkit-user-select:none;user-select:none}
+#hud{position:absolute;left:8px;bottom:8px;display:flex;gap:6px;align-items:center;
+  pointer-events:none;font-size:11px;color:var(--dim2)}
+#hud .pill{background:rgba(15,17,21,.82);border:1px solid var(--line);border-radius:99px;
+  padding:3px 9px;pointer-events:auto}
+#zoomer{position:absolute;right:8px;bottom:8px;display:flex;flex-direction:column;gap:4px}
+#zoomer .btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+  border-radius:6px;padding:0}
+#toast{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:rgba(20,24,30,.95);
+  border:1px solid var(--line2);border-radius:6px;padding:6px 12px;font-size:12px;opacity:0;
+  transition:opacity .18s;pointer-events:none;z-index:20}
+#toast.show{opacity:1}
+
+/* mobile drawers */
+#scrim{position:absolute;inset:0;background:rgba(0,0,0,.5);display:none;z-index:14}
+@media (max-width:900px){
+  #outline,#inspector{position:absolute;top:0;bottom:0;z-index:15;box-shadow:0 0 40px #000}
+  #outline{left:0}#inspector{right:0;width:min(320px,86vw)}
+  .pnlhd .x{display:block}
+  #scrim.show{display:block}
+}
+
+/* modal */
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:30;
+  align-items:center;justify-content:center;padding:16px}
+#modal.show{display:flex}
+#modalBox{background:var(--panel);border:1px solid var(--line2);border-radius:8px;
+  width:min(760px,100%);max-height:86vh;display:flex;flex-direction:column}
+#modalBox header{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;
+  align-items:center;gap:8px;font-size:13px}
+#modalBox .bd{padding:10px 12px;overflow:auto}
+#modalBox footer{padding:10px 12px;border-top:1px solid var(--line);display:flex;gap:8px;
+  justify-content:flex-end}
+#jsonArea{width:100%;height:46vh;background:#0c0e12;border:1px solid var(--line2);border-radius:5px;
+  padding:8px;font:11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;resize:none}
+.helpgrid{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;align-items:center;font-size:12.5px}
+.helpgrid div:nth-child(odd){text-align:right;color:var(--dim)}
+h4{margin:14px 0 6px;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--acc)}
+h4:first-child{margin-top:0}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="top">
+    <div class="brand"><b>LTX&nbsp;2.5</b><span>educational data-flow + source map</span></div>
+    <div class="sep"></div>
+
+    <span class="lbl">view</span>
+    <div class="seg" id="viewSeg">
+      <button class="btn on" data-view="flow">Data flow</button>
+      <button class="btn" data-view="arch">Architecture</button>
+    </div>
+    <div class="sep"></div>
+
+    <span class="lbl">recipe</span>
+    <div class="seg" id="variantSeg">
+      <button class="btn on" data-variant="t2v">T2V base</button>
+      <button class="btn" data-variant="image">+ image</button>
+    </div>
+    <div class="sep"></div>
+
+    <span class="lbl">wires</span>
+    <div class="seg" id="wireSeg">
+      <button class="btn on" data-k="data">tensor</button>
+      <button class="btn" data-k="cond">control</button>
+      <button class="btn" data-k="residual">loop</button>
+    </div>
+    <div class="sep"></div>
+
+    <span class="lbl">depth</span>
+    <div class="seg" id="lvlSeg">
+      <button class="btn on" data-lvl="1">1</button>
+      <button class="btn" data-lvl="2">2</button>
+      <button class="btn" data-lvl="3">3</button>
+      <button class="btn" data-lvl="4">4</button>
+      <button class="btn" data-lvl="99">All</button>
+    </div>
+    <div class="sep"></div>
+
+    <button class="btn" id="btnLayout" title="Re-run auto layout (unpins everything)">Auto-layout</button>
+    <button class="btn" id="btnDir" title="Flow direction">↓ Top-down</button>
+    <button class="btn" id="btnFit" title="Fit to view (F)">Fit</button>
+    <div class="sep"></div>
+
+    <button class="btn icon" id="btnUndo" title="Undo (Z)">↶</button>
+    <button class="btn icon" id="btnRedo" title="Redo (Shift+Z)">↷</button>
+    <div class="sep"></div>
+
+    <button class="btn" id="btnGroup" title="Group selection (G)">Group</button>
+    <button class="btn" id="btnUngroup" title="Ungroup (Shift+G)">Ungroup</button>
+    <button class="btn" id="btnAdd" title="Add node (A)">+ Node</button>
+    <div class="sep"></div>
+
+    <input id="search" placeholder="search…" style="background:#10131a;border:1px solid var(--line2);
+      border-radius:5px;padding:5px 8px;width:130px;flex:0 0 auto">
+    <div class="sep"></div>
+    <button class="btn" id="btnJson">JSON</button>
+    <button class="btn icon" id="btnHelp" title="Help (?)">?</button>
+    <button class="btn icon" id="btnPanels" title="Toggle hierarchy panel">▤</button>
+    <button class="btn icon" id="btnInsp" title="Toggle inspector">ⓘ</button>
+  </div>
+
+  <div id="body">
+    <div id="outline">
+      <div class="pnlhd">Learning hierarchy <span class="x" data-close="outline">✕</span></div>
+      <div class="pnlbd" id="tree"></div>
+    </div>
+
+    <div id="canvasWrap">
+      <svg id="svg"></svg>
+      <div id="hud">
+        <span class="pill" id="hudZoom">100%</span>
+        <span class="pill" id="hudInfo">—</span>
+      </div>
+      <div id="zoomer">
+        <button class="btn" id="zIn">+</button>
+        <button class="btn" id="zOut">−</button>
+      </div>
+      <div id="toast"></div>
+    </div>
+
+    <div id="inspector">
+      <div class="pnlhd">Inspector <span class="x" data-close="inspector">✕</span></div>
+      <div class="pnlbd" id="insp"></div>
+    </div>
+    <div id="scrim"></div>
+  </div>
+</div>
+
+<div id="modal"><div id="modalBox">
+  <header><b id="modalTitle">JSON</b><span style="margin-left:auto"></span>
+    <button class="btn" id="modalClose">Close</button></header>
+  <div class="bd" id="modalBody"></div>
+  <footer id="modalFoot"></footer>
+</div></div>
+
+<script>
+"use strict";
+/* ============================================================================
+   DATA MODEL
+   ----------------------------------------------------------------------------
+   One flat node table with parent pointers, plus ONE edge table defined at the
+   FINEST level that is known. Coarse-level connections are *derived* at draw
+   time by lifting each endpoint to its deepest visible ancestor. That is the
+   same shape the data will have when it comes from real sources:
+      - node table   <- semantic flow hierarchy + checkpoint/module evidence
+      - edge table   <- traced forward pass
+   `src` marks provenance so a hand-guessed edge never looks like a measured one:
+      v = verified (paper / weights)   i = inferred   p = placeholder guess
+   ========================================================================== */
+
+const KINDS = ['group','input','output','conv','norm','act','attn','mlp','linear',
+               'add','sample','ctrl','embed','resample'];
+
+function blankGraph(){ return {meta:{name:'',note:''}, nodes:[], edges:[]}; }
+
+let G = blankGraph();
+let byId = Object.create(null);
+
+function reindex(g){
+  byId = Object.create(null);
+  g.nodes.forEach(n=>{ n.children=[]; byId[n.id]=n; });
+  g.nodes.forEach(n=>{ if(n.parent && byId[n.parent]) byId[n.parent].children.push(n.id); });
+  g.edges.forEach((e,i)=>{ if(!e.id) e.id='e'+i; });
+  g.edges = g.edges.filter(e=>byId[e.from] && byId[e.to]);
+}
+
+/* ---- authoring helpers used to build the built-in checkpoint map ---- */
+function N(id,parent,name,kind,o){
+  o = o||{};
+  const n = {id, parent:parent||null, name, kind:kind||'group',
+             shape:o.shape||'', params:o.params||'', note:o.note||'',
+             src:o.src||'p', rep:o.rep||0, open:!!o.open, locs:o.locs||[],
+             pinned:false, x:0, y:0};
+  G.nodes.push(n); return id;
+}
+let _e=0;
+function E(a,b,o){
+  o=o||{};
+  G.edges.push({id:'e'+(_e++), from:a, to:b, kind:o.kind||'data',
+                label:o.label||'', views:o.views||['arch','flow'], src:o.src||'p',
+                locs:o.locs||[]});
+}
+/* items: [suffix, name, kind, opts] -> creates children of `parent`, wired in series */
+function chain(parent, items){
+  let prev=null, first=null;
+  for(const it of items){
+    const id = N(parent+'.'+it[0], parent, it[1], it[2], it[3]);
+    if(prev) E(prev,id,{src:(it[3]&&it[3].src)||'v',locs:(it[3]&&it[3].locs)||[]}); else first=id;
+    prev=id;
+  }
+  return {first, last:prev, all:items.map(i=>parent+'.'+i[0])};
+}
+
+/* ============================================================================
+   AUTHORITATIVE GRAPH — LTX 2.5 DISTILLED BF16
+   Counts and shapes come from the saved safetensors headers. Ownership and
+   execution order come from this repository's Python implementation. Amber
+   nodes are deliberate semantic aggregations; no unsupported topology is drawn.
+   ========================================================================== */
+const sl=(label,path,line,symbol)=>({label,path,line,symbol:symbol||''});
+const SRC={
+  pipeline:[sl('DistilledPipeline','packages/ltx-pipelines/src/ltx_pipelines/distilled.py',87,'DistilledPipeline')],
+  pipelineCall:[sl('DistilledPipeline.__call__','packages/ltx-pipelines/src/ltx_pipelines/distilled.py',187,'DistilledPipeline.__call__')],
+  oneStage:[sl('TI2VidOneStagePipeline','packages/ltx-pipelines/src/ltx_pipelines/ti2vid_one_stage.py',57,'TI2VidOneStagePipeline')],
+  oneStageCall:[sl('TI2VidOneStagePipeline.__call__','packages/ltx-pipelines/src/ltx_pipelines/ti2vid_one_stage.py',132,'TI2VidOneStagePipeline.__call__')],
+  stage:[sl('DiffusionStage','packages/ltx-pipelines/src/ltx_pipelines/utils/blocks.py',253,'DiffusionStage'),sl('DiffusionStage.__call__','packages/ltx-pipelines/src/ltx_pipelines/utils/blocks.py',501,'DiffusionStage.__call__')],
+  noiser:[sl('GaussianNoiser','packages/ltx-core/src/ltx_core/components/noisers.py',15,'GaussianNoiser')],
+  scheduler:[sl('LTX2Scheduler','packages/ltx-core/src/ltx_core/components/schedulers.py',14,'LTX2Scheduler')],
+  sampler:[sl('Euler ancestral loop','packages/ltx-pipelines/src/ltx_pipelines/utils/samplers.py',566,'euler_ancestral_denoising_loop'),sl('Euler loop','packages/ltx-pipelines/src/ltx_pipelines/utils/samplers.py',39,'euler_denoising_loop')],
+  denoiser:[sl('FactoryGuidedDenoiser','packages/ltx-pipelines/src/ltx_pipelines/utils/denoisers.py',304,'FactoryGuidedDenoiser'),sl('_guided_denoise','packages/ltx-pipelines/src/ltx_pipelines/utils/denoisers.py',61,'_guided_denoise')],
+  guider:[sl('MultiModalGuider','packages/ltx-core/src/ltx_core/components/guiders.py',234,'MultiModalGuider'),sl('MultiModalGuider.calculate','packages/ltx-core/src/ltx_core/components/guiders.py',244,'MultiModalGuider.calculate')],
+  prompt:[sl('PromptEncoder','packages/ltx-pipelines/src/ltx_pipelines/utils/blocks.py',629,'PromptEncoder')],
+  tokenizer:[sl('LTXGemmaTokenizer','packages/ltx-core/src/ltx_core/text_encoders/gemma/tokenizer.py',11,'LTXGemmaTokenizer')],
+  gemma:[sl('LTXGemmaTextEncoder','packages/ltx-core/src/ltx_core/text_encoders/gemma/encoders/base_encoder.py',30,'LTXGemmaTextEncoder'),sl('Gemma 4 checkpoint config','hf_metadata/ltx_25_full_repo_metadata.json',358355,'gemma_config')],
+  feature:[sl('FeatureExtractorV2','packages/ltx-core/src/ltx_core/text_encoders/gemma/feature_extractor.py',100,'FeatureExtractorV2')],
+  processor:[sl('EmbeddingsProcessor','packages/ltx-core/src/ltx_core/text_encoders/gemma/embeddings_processor.py',51,'EmbeddingsProcessor')],
+  connector:[sl('Embeddings1DConnector','packages/ltx-core/src/ltx_core/text_encoders/gemma/embeddings_connector.py',74,'Embeddings1DConnector'),sl('Transformer checkpoint config','hf_metadata/ltx_25_full_repo_metadata.json',121372,'config.transformer')],
+  duration:[sl('DurationPredictor','packages/ltx-pipelines/src/ltx_pipelines/utils/blocks.py',803,'DurationPredictor'),sl('DurationHead','packages/ltx-core/src/ltx_core/duration_head/duration_head.py',52,'DurationHead'),sl('Duration checkpoint','hf_metadata/ltx_25_full_repo_metadata.json',358189,'config.duration_head')],
+  imageCond:[sl('ImageConditioner','packages/ltx-pipelines/src/ltx_pipelines/utils/blocks.py',936,'ImageConditioner'),sl('combined_image_conditionings','packages/ltx-pipelines/src/ltx_pipelines/utils/helpers.py',272,'combined_image_conditionings')],
+  videoEnc:[sl('VideoEncoder','packages/ltx-core/src/ltx_core/model/video_vae/video_vae.py',148,'VideoEncoder'),sl('Video VAE checkpoint config','hf_metadata/ltx_25_full_repo_metadata.json',394329,'config.vae.encoder')],
+  videoEncBlock:[sl('_make_encoder_block','packages/ltx-core/src/ltx_core/model/video_vae/video_vae.py',39,'_make_encoder_block')],
+  model:[sl('LTXModel','packages/ltx-core/src/ltx_core/model/transformer/model.py',42,'LTXModel'),sl('Transformer checkpoint config','hf_metadata/ltx_25_full_repo_metadata.json',121372,'config.transformer')],
+  block:[sl('BasicAVTransformerBlock','packages/ltx-core/src/ltx_core/model/transformer/transformer.py',87,'BasicAVTransformerBlock')],
+  blockForward:[sl('BasicAVTransformerBlock.forward','packages/ltx-core/src/ltx_core/model/transformer/transformer.py',254,'BasicAVTransformerBlock.forward')],
+  attention:[sl('Attention','packages/ltx-core/src/ltx_core/model/transformer/attention.py',478,'Attention')],
+  ffn:[sl('FeedForward','packages/ltx-core/src/ltx_core/model/transformer/feed_forward.py',6,'FeedForward')],
+  adaln:[sl('AdaLayerNormSingle','packages/ltx-core/src/ltx_core/model/transformer/adaln.py',19,'AdaLayerNormSingle')],
+  upsampler:[sl('VideoUpsampler','packages/ltx-pipelines/src/ltx_pipelines/utils/blocks.py',999,'VideoUpsampler'),sl('LatentUpsampler','packages/ltx-core/src/ltx_core/model/upsampler/model.py',11,'LatentUpsampler'),sl('Spatial-upscaler checkpoint config','hf_metadata/ltx_25_full_repo_metadata.json',320055,'config')],
+  videoDec:[sl('VideoDecoder pipeline block','packages/ltx-pipelines/src/ltx_pipelines/utils/blocks.py',1048,'VideoDecoder'),sl('DiffusionVideoDecoder','packages/ltx-core/src/ltx_core/model/video_vae/diffusion_video_decoder.py',62,'DiffusionVideoDecoder'),sl('Video VAE checkpoint config','hf_metadata/ltx_25_full_repo_metadata.json',394329,'config.vae.decoder')],
+  naBlock:[sl('NABlock','packages/ltx-core/src/ltx_core/model/video_vae/transformer/blocks.py',22,'NABlock')],
+  pixelUp:[sl('LinearPixelShuffleUpsample','packages/ltx-core/src/ltx_core/model/video_vae/transformer/layers.py',25,'LinearPixelShuffleUpsample')],
+  audioDec:[sl('AudioDecoder pipeline block','packages/ltx-pipelines/src/ltx_pipelines/utils/blocks.py',1152,'AudioDecoder'),sl('AudioDecoder','packages/ltx-core/src/ltx_core/model/audio_vae/audio_vae.py',277,'AudioDecoder'),sl('Audio checkpoint config','hf_metadata/ltx_25_full_repo_metadata.json',379649,'config.audio_vae')],
+  vocoder:[sl('VocoderWithBWE','packages/ltx-core/src/ltx_core/model/audio_vae/vocoder.py',519,'VocoderWithBWE'),sl('Audio checkpoint config','hf_metadata/ltx_25_full_repo_metadata.json',379649,'config.vocoder')],
+  output:[sl('decode_audio','packages/ltx-core/src/ltx_core/model/audio_vae/audio_vae.py',497,'decode_audio')]
+};
+
+function buildAccurateGraph(){
+  G=blankGraph(); _e=0;
+  G.meta={
+    name:'LTX 2.5 — distilled BF16 checkpoint & source map',
+    note:'Audited against repository code and saved LTX-2.5 safetensors headers. '+
+         'Green = exact code/checkpoint fact; amber = semantic aggregation.',
+    sourceRoot:'I:/dev/LTX-2',
+    repoUrl:'https://github.com/Lightricks/LTX-2',
+    repoRef:'7a0a3a7abe4bff45548ccdefbf973338ae38e883',
+    checkpoint:'distilled transformer BF16 + Gemma 4 BF16 + diffusion video VAE BF16 + '+
+               'audio VAE BF16 + spatial upscaler BF16 + duration head BF16'
+  };
+
+  /* ---------------- DistilledPipeline control flow ---------------- */
+  N('pipe',null,'DistilledPipeline (two-stage)','group',{src:'v',open:true,locs:SRC.pipeline,
+    note:'Half-resolution ancestral stage, 2× spatial latent upsample, then deterministic refinement.'});
+  N('pipe.prompt','pipe','Text prompt','input',{shape:'str',src:'v',locs:SRC.pipelineCall});
+  N('pipe.images','pipe','Image conditionings','input',{shape:'list[image, frame, strength, crf?]',src:'v',locs:SRC.pipelineCall});
+  N('pipe.seed','pipe','Seed → Gaussian noise','sample',{src:'v',locs:SRC.noiser});
+  N('pipe.duration','pipe','Auto duration (optional)','ctrl',{shape:'num_frames',params:'1.90M',src:'v',locs:SRC.duration});
+  N('pipe.cond1','pipe','Encode image cond @ ½ res','ctrl',{src:'v',locs:SRC.imageCond});
+  N('pipe.s1','pipe','Stage 1: AV denoise @ ½ res','ctrl',{src:'v',locs:[...SRC.stage,...SRC.sampler],
+    note:'LTX-2.5 distilled uses Euler ancestral sampling for stage 1.'});
+  N('pipe.up','pipe','Spatial latent upsample ×2','resample',{shape:'video latent H×2,W×2',params:'497.87M',src:'v',locs:SRC.upsampler});
+  N('pipe.cond2','pipe','Encode image cond @ full res','ctrl',{src:'v',locs:SRC.imageCond});
+  N('pipe.s2','pipe','Stage 2: deterministic AV refine','ctrl',{src:'v',locs:[...SRC.stage,...SRC.sampler],
+    note:'Three-step stage-2 schedule uses plain Euler; audio continues from stage 1.'});
+  N('pipe.vdecode','pipe','Decode final video latent','ctrl',{src:'v',locs:SRC.videoDec});
+  N('pipe.adecode','pipe','Decode final audio latent','ctrl',{src:'v',locs:SRC.audioDec});
+
+  /* ---------------- Text encoder + checkpoint projections/connectors ---------------- */
+  N('txt',null,'PromptEncoder stack','group',{params:'13.12B TE + 2.02B connectors',src:'v',locs:SRC.prompt});
+  N('txt.tok','txt','LTX Gemma tokenizer','embed',{shape:'B·T',src:'v',locs:SRC.tokenizer});
+  N('txt.gemma','txt','Gemma 4 Unified 12B','group',{params:'≈11.91B LM weights',src:'v',locs:SRC.gemma});
+  N('txt.gemma.emb','txt.gemma','Token embedding','embed',{shape:'B·T·3840',params:'1.007B',src:'v',locs:SRC.gemma});
+  N('txt.gemma.blocks','txt.gemma','Gemma decoder layers ×48','group',{rep:48,params:'10.901B',src:'v',locs:SRC.gemma,
+    note:'Layer internals are supplied by Transformers from the embedded Gemma 4 config.'});
+  N('txt.gemma.states','txt.gemma','All hidden states (embed + 48)','output',{shape:'B·T·3840·49',src:'v',locs:SRC.gemma});
+  N('txt.fe','txt','FeatureExtractorV2','group',{src:'v',locs:SRC.feature});
+  N('txt.fe.rms','txt.fe','Per-token, per-layer RMS norm','norm',{shape:'B·T·3840·49',src:'v',locs:SRC.feature});
+  N('txt.fe.flat','txt.fe','Flatten layers','resample',{shape:'B·T·188160',src:'v',locs:SRC.feature});
+  N('txt.fe.vproj','txt.fe','Video aggregate projection','linear',{shape:'188160 → 4096',params:'770.71M',src:'v',locs:SRC.feature});
+  N('txt.fe.aproj','txt.fe','Audio aggregate projection','linear',{shape:'188160 → 2048',params:'385.35M',src:'v',locs:SRC.feature});
+  N('txt.connv','txt','Video text connector ×8','group',{rep:8,params:'1.613B',src:'v',locs:SRC.connector});
+  N('txt.connv.reg','txt.connv','Learned padding registers','embed',{shape:'128·4096',src:'v',locs:SRC.connector});
+  N('txt.connv.blocks','txt.connv','Self-attn + GELU FFN ×8','attn',{rep:8,shape:'B·T·4096',src:'v',locs:SRC.connector});
+  N('txt.connv.out','txt.connv','Final RMSNorm','norm',{shape:'B·T·4096',src:'v',locs:SRC.connector});
+  N('txt.conna','txt','Audio text connector ×8','group',{rep:8,params:'403.62M',src:'v',locs:SRC.connector});
+  N('txt.conna.reg','txt.conna','Learned padding registers','embed',{shape:'128·2048',src:'v',locs:SRC.connector});
+  N('txt.conna.blocks','txt.conna','Self-attn + GELU FFN ×8','attn',{rep:8,shape:'B·T·2048',src:'v',locs:SRC.connector});
+  N('txt.conna.out','txt.conna','Final RMSNorm','norm',{shape:'B·T·2048',src:'v',locs:SRC.connector});
+
+  E('pipe.prompt','txt.tok',{src:'v',locs:SRC.prompt});
+  E('txt.tok','txt.gemma.emb',{src:'v',locs:SRC.gemma});
+  E('txt.gemma.emb','txt.gemma.blocks',{src:'v',locs:SRC.gemma});
+  E('txt.gemma.blocks','txt.gemma.states',{src:'v',locs:SRC.gemma});
+  E('txt.gemma.states','txt.fe.rms',{src:'v',locs:SRC.processor});
+  E('txt.fe.rms','txt.fe.flat',{src:'v',locs:SRC.feature});
+  E('txt.fe.flat','txt.fe.vproj',{src:'v',locs:SRC.feature});
+  E('txt.fe.flat','txt.fe.aproj',{src:'v',locs:SRC.feature});
+  E('txt.fe.vproj','txt.connv.reg',{src:'v',locs:SRC.processor});
+  E('txt.connv.reg','txt.connv.blocks',{src:'v',locs:SRC.connector});
+  E('txt.connv.blocks','txt.connv.out',{src:'v',locs:SRC.connector});
+  E('txt.fe.aproj','txt.conna.reg',{src:'v',locs:SRC.processor});
+  E('txt.conna.reg','txt.conna.blocks',{src:'v',locs:SRC.connector});
+  E('txt.conna.blocks','txt.conna.out',{src:'v',locs:SRC.connector});
+  E('txt.connv.out','pipe.duration',{kind:'cond',label:'video encoding',src:'v',locs:SRC.duration});
+  E('txt.conna.out','pipe.duration',{kind:'cond',label:'audio encoding',src:'v',locs:SRC.duration});
+
+  /* ---------------- Image-conditioning video VAE encoder ---------------- */
+  N('venc',null,'Video VAE Encoder','group',{params:'318.94M',src:'v',locs:SRC.videoEnc});
+  const ve=chain('venc',[
+    ['patch','Patchify spatial ×4','resample',{shape:'B·48·F·H/4·W/4',src:'v',locs:SRC.videoEnc}],
+    ['stem','Causal Conv3d 48→128 k3','conv',{src:'v',locs:SRC.videoEnc}],
+    ['r1','Residual layers ×4','conv',{rep:4,src:'v',locs:SRC.videoEncBlock}],
+    ['cs','Compress space ×2','resample',{shape:'H/8·W/8',src:'v',locs:SRC.videoEncBlock}],
+    ['r2','Residual layers ×6','conv',{rep:6,src:'v',locs:SRC.videoEncBlock}],
+    ['ct','Compress time ×2','resample',{shape:'F/2',src:'v',locs:SRC.videoEncBlock}],
+    ['r3','Residual layers ×4','conv',{rep:4,src:'v',locs:SRC.videoEncBlock}],
+    ['ca1','Compress all axes ×2','resample',{shape:'F/4·H/16·W/16',src:'v',locs:SRC.videoEncBlock}],
+    ['r4','Residual layers ×2','conv',{rep:2,src:'v',locs:SRC.videoEncBlock}],
+    ['ca2','Compress all axes ×2','resample',{shape:'F/8·H/32·W/32',src:'v',locs:SRC.videoEncBlock}],
+    ['r5','Residual layers ×2','conv',{rep:2,src:'v',locs:SRC.videoEncBlock}],
+    ['head','PixelNorm → SiLU → Conv3d','norm',{shape:'129 channels internally',src:'v',locs:SRC.videoEnc}],
+    ['mean','Keep + normalize latent mean','output',{shape:'B·128·(1+(F−1)/8)·H/32·W/32',src:'v',locs:SRC.videoEnc,
+      note:'Checkpoint uses constant log variance; forward returns normalized means, not stochastic samples.'}]
+  ]);
+  E('pipe.images',ve.first,{src:'v',locs:SRC.imageCond});
+  E(ve.last,'pipe.cond1',{kind:'cond',label:'½-res latent cond',src:'v',locs:SRC.imageCond});
+  E(ve.last,'pipe.cond2',{kind:'cond',label:'full-res latent cond',src:'v',locs:SRC.imageCond});
+
+  /* ---------------- 18.988B LTXModel core from the 21.004B transformer file ---------------- */
+  N('dit',null,'LTXModel core — paired AV transformer','group',{params:'18.988B core',src:'v',open:true,locs:SRC.model,
+    note:'The transformer file stores 21.004B elements total; 2.016B connector weights are routed into PromptEncoder.'});
+  N('dit.vin','dit','Video Linear 128→4096','linear',{shape:'B·Sᵥ·4096',params:'528.38K',src:'v',locs:SRC.model});
+  N('dit.ain','dit','Audio Linear 128→2048','linear',{shape:'B·Sₐ·2048',params:'264.19K',src:'v',locs:SRC.model});
+  N('dit.vrope','dit','Video RoPE (t,y,x)','ctrl',{shape:'max 20·2048·2048',src:'v',locs:SRC.model});
+  N('dit.arope','dit','Audio RoPE (t)','ctrl',{shape:'max 20',src:'v',locs:SRC.model});
+  N('dit.ada','dit','Timestep + AV AdaLN embeddings','embed',{src:'v',locs:SRC.adaln});
+  N('dit.blocks','dit','BasicAVTransformerBlock ×48','group',{rep:48,params:'18.560B',src:'v',locs:SRC.block});
+  N('dit.blocks.vsa','dit.blocks','Video self-attention','attn',{shape:'32 heads · d128',src:'v',locs:SRC.attention});
+  N('dit.blocks.vtxt','dit.blocks','Video ← text cross-attn','attn',{shape:'context 4096',src:'v',locs:SRC.blockForward});
+  N('dit.blocks.asa','dit.blocks','Audio self-attention','attn',{shape:'32 heads · d64',src:'v',locs:SRC.attention});
+  N('dit.blocks.atxt','dit.blocks','Audio ← text cross-attn','attn',{shape:'context 2048',src:'v',locs:SRC.blockForward});
+  N('dit.blocks.a2v','dit.blocks','Audio → video cross-attn','attn',{shape:'Q video; K,V audio',src:'v',locs:SRC.blockForward});
+  N('dit.blocks.v2a','dit.blocks','Video → audio cross-attn','attn',{shape:'Q audio; K,V video',src:'v',locs:SRC.blockForward});
+  N('dit.blocks.vff','dit.blocks','Video GELU-approx FFN','mlp',{shape:'4096→16384→4096',src:'v',locs:SRC.ffn});
+  N('dit.blocks.aff','dit.blocks','Audio GELU-approx FFN','mlp',{shape:'2048→8192→2048',src:'v',locs:SRC.ffn});
+  N('dit.vout','dit','Video norm + Linear 4096→128','linear',{shape:'B·128·f·h·w',src:'v',locs:SRC.model});
+  N('dit.aout','dit','Audio norm + Linear 2048→128','linear',{shape:'B·8·Tₐ·16',src:'v',locs:SRC.model});
+
+  E('dit.vin','dit.blocks.vsa',{src:'v',locs:SRC.blockForward});
+  E('dit.blocks.vsa','dit.blocks.vtxt',{src:'v',locs:SRC.blockForward});
+  E('dit.ain','dit.blocks.asa',{src:'v',locs:SRC.blockForward});
+  E('dit.blocks.asa','dit.blocks.atxt',{src:'v',locs:SRC.blockForward});
+  E('txt.connv.out','dit.blocks.vtxt',{kind:'cond',label:'text context 4096',src:'v',locs:SRC.blockForward});
+  E('txt.conna.out','dit.blocks.atxt',{kind:'cond',label:'text context 2048',src:'v',locs:SRC.blockForward});
+  E('dit.blocks.vtxt','dit.blocks.a2v',{src:'v',locs:SRC.blockForward});
+  E('dit.blocks.atxt','dit.blocks.a2v',{kind:'cond',label:'audio K,V',src:'v',locs:SRC.blockForward});
+  E('dit.blocks.atxt','dit.blocks.v2a',{src:'v',locs:SRC.blockForward});
+  E('dit.blocks.vtxt','dit.blocks.v2a',{kind:'cond',label:'video K,V',src:'v',locs:SRC.blockForward});
+  E('dit.blocks.a2v','dit.blocks.vff',{src:'v',locs:SRC.blockForward});
+  E('dit.blocks.v2a','dit.blocks.aff',{src:'v',locs:SRC.blockForward});
+  E('dit.blocks.vff','dit.vout',{src:'v',locs:SRC.model});
+  E('dit.blocks.aff','dit.aout',{src:'v',locs:SRC.model});
+  E('dit.vrope','dit.blocks.vsa',{kind:'cond',src:'v',locs:SRC.model});
+  E('dit.arope','dit.blocks.asa',{kind:'cond',src:'v',locs:SRC.model});
+  E('dit.ada','dit.blocks.vsa',{kind:'cond',src:'v',locs:SRC.blockForward});
+  E('dit.ada','dit.blocks.asa',{kind:'cond',src:'v',locs:SRC.blockForward});
+
+  /* Pipeline-stage calls and loop-carried state live outside LTXModel. */
+  E('pipe.seed','pipe.s1',{kind:'cond',label:'initial noise',src:'v',locs:SRC.noiser});
+  E('pipe.duration','pipe.s1',{kind:'cond',label:'frames',src:'v',locs:SRC.pipelineCall});
+  E('pipe.cond1','pipe.s1',{kind:'cond',label:'video conditioning',src:'v',locs:SRC.pipelineCall});
+  E('txt.connv.out','pipe.s1',{kind:'cond',label:'video context',src:'v',locs:SRC.pipelineCall});
+  E('txt.conna.out','pipe.s1',{kind:'cond',label:'audio context',src:'v',locs:SRC.pipelineCall});
+  E('pipe.s1','dit.vin',{label:'video state',src:'v',locs:SRC.stage});
+  E('pipe.s1','dit.ain',{label:'audio state',src:'v',locs:SRC.stage});
+  E('dit.vout','pipe.s1',{kind:'residual',label:'Euler update',src:'v',locs:SRC.sampler,views:['flow']});
+  E('dit.aout','pipe.s1',{kind:'residual',label:'Euler update',src:'v',locs:SRC.sampler,views:['flow']});
+  E('pipe.s1','pipe.up',{label:'video latent',src:'v',locs:SRC.pipelineCall});
+  E('pipe.images','pipe.cond2',{kind:'cond',src:'v',locs:SRC.pipelineCall});
+  E('pipe.s1','pipe.s2',{label:'initial audio latent',src:'v',locs:SRC.pipelineCall});
+  E('pipe.cond2','pipe.s2',{kind:'cond',label:'video conditioning',src:'v',locs:SRC.pipelineCall});
+  E('txt.connv.out','pipe.s2',{kind:'cond',label:'video context',src:'v',locs:SRC.pipelineCall});
+  E('txt.conna.out','pipe.s2',{kind:'cond',label:'audio context',src:'v',locs:SRC.pipelineCall});
+  E('pipe.s2','dit.vin',{label:'refine video',src:'v',locs:SRC.stage});
+  E('pipe.s2','dit.ain',{label:'refine audio',src:'v',locs:SRC.stage});
+  E('dit.vout','pipe.s2',{kind:'residual',label:'Euler update',src:'v',locs:SRC.sampler,views:['flow']});
+  E('dit.aout','pipe.s2',{kind:'residual',label:'Euler update',src:'v',locs:SRC.sampler,views:['flow']});
+
+  /* ---------------- Separate 497.87M stage-2 spatial latent upsampler ---------------- */
+  N('up',null,'Latent spatial upsampler ×2','group',{params:'497.87M',src:'v',locs:SRC.upsampler});
+  chain('up',[
+    ['denorm','Undo per-channel latent norm','norm',{src:'v',locs:SRC.upsampler}],
+    ['in','Conv3d 128→1024','conv',{src:'v',locs:SRC.upsampler}],
+    ['pre','ResBlocks ×4','conv',{rep:4,src:'v',locs:SRC.upsampler}],
+    ['resize','Framewise Conv2d + PixelShuffle ×2','resample',{shape:'H×2·W×2',src:'v',locs:SRC.upsampler}],
+    ['post','ResBlocks ×4','conv',{rep:4,src:'v',locs:SRC.upsampler}],
+    ['out','Conv3d 1024→128','conv',{shape:'B·128·f·2h·2w',src:'v',locs:SRC.upsampler}],
+    ['norm','Restore per-channel latent norm','norm',{src:'v',locs:SRC.upsampler}]
+  ]);
+  E('pipe.up','up.denorm',{kind:'cond',label:'calls',src:'v',locs:SRC.upsampler});
+  E('up.norm','pipe.s2',{label:'initial video latent',src:'v',locs:SRC.pipelineCall});
+
+  /* ---------------- 417.13M diffusion video VAE decoder ---------------- */
+  N('vdec',null,'DiffusionVideoDecoder (selected)','group',{params:'417.13M decoder',src:'v',locs:SRC.videoDec,
+    note:'The alternative conv VAE checkpoint selects ConvVideoDecoder and is not expanded in this map.'});
+  const vdStem=chain('vdec',[
+    ['denorm','Undo per-channel latent norm','norm',{shape:'B·128·f·h·w',src:'v',locs:SRC.videoDec}],
+    ['in','ChannelLinear 128→2048','linear',{src:'v',locs:SRC.videoDec}],
+    ['s1','NA stage 1 ×4','attn',{rep:4,shape:'C2048 · kernel 3×7×7',src:'v',locs:SRC.naBlock}],
+    ['u1','Pixel-shuffle up (1,2,2)','resample',{src:'v',locs:SRC.pixelUp}],
+    ['s2','NA stage 2 ×6','attn',{rep:6,shape:'C1024 · kernel 3×7×7',src:'v',locs:SRC.naBlock}],
+    ['u2','Pixel-shuffle up (2,1,1)','resample',{src:'v',locs:SRC.pixelUp}],
+    ['s3','NA stage 3 ×4','attn',{rep:4,shape:'C512 · kernel 3×5×5',src:'v',locs:SRC.naBlock}],
+    ['u3','Pixel-shuffle up (2,2,2)','resample',{src:'v',locs:SRC.pixelUp}],
+    ['s4','NA stage 4 ×2','attn',{rep:2,shape:'C512 · kernel 3×5×5',src:'v',locs:SRC.naBlock}],
+    ['u4','Pixel-shuffle up (2,2,2)','resample',{src:'v',locs:SRC.pixelUp}],
+    ['ctx','Stage-5 latent context C256','linear',{src:'v',locs:SRC.videoDec}]
+  ]);
+  N('vdec.noise','vdec','Patchified pixel noise xₜ','sample',{shape:'B·48·F·H/4·W/4',src:'v',locs:SRC.videoDec});
+  N('vdec.diff','vdec','Diffusion NA blocks ×8','attn',{rep:8,shape:'C256 · kernel 11³ · 1 step',src:'v',locs:SRC.videoDec});
+  N('vdec.out','vdec','RMSNorm + ChannelLinear','linear',{shape:'48 patched RGB channels',src:'v',locs:SRC.videoDec});
+  N('vdec.unp','vdec','Unpatchify spatial ×4','resample',{shape:'B·3·F·H·W',src:'v',locs:SRC.videoDec});
+  const vd={first:vdStem.first,last:'vdec.unp'};
+  E('pipe.s2','pipe.vdecode',{label:'final video latent',src:'v',locs:SRC.pipelineCall});
+  E('pipe.vdecode',vd.first,{kind:'cond',label:'calls',src:'v',locs:SRC.videoDec});
+  E('vdec.ctx','vdec.diff',{kind:'cond',label:'latent context',src:'v',locs:SRC.videoDec});
+  E('vdec.noise','vdec.diff',{src:'v',locs:SRC.videoDec});
+  E('vdec.diff','vdec.out',{src:'v',locs:SRC.videoDec});
+  E('vdec.out','vdec.unp',{src:'v',locs:SRC.videoDec});
+
+  /* ---------------- 31.92M audio VAE decoder + 129.09M vocoder/BWE ---------------- */
+  N('adec',null,'Audio VAE Decoder','group',{params:'31.92M',src:'v',locs:SRC.audioDec});
+  const ad=chain('adec',[
+    ['denorm','Unnormalize latent','norm',{shape:'B·8·Tₐ·16',src:'v',locs:SRC.audioDec}],
+    ['in','Causal Conv2d 8→512','conv',{src:'v',locs:SRC.audioDec}],
+    ['mid','Mid ResNet blocks ×2','conv',{rep:2,src:'v',locs:SRC.audioDec}],
+    ['l3','Resolution level C512 ×3','conv',{rep:3,src:'v',locs:SRC.audioDec}],
+    ['u2','Causal upsample ×2','resample',{src:'v',locs:SRC.audioDec}],
+    ['l2','Resolution level C256 ×3','conv',{rep:3,src:'v',locs:SRC.audioDec}],
+    ['u1','Causal upsample ×2','resample',{src:'v',locs:SRC.audioDec}],
+    ['l1','Resolution level C128 ×3','conv',{rep:3,src:'v',locs:SRC.audioDec}],
+    ['out','PixelNorm → SiLU → Conv2d','conv',{shape:'B·2·Tmel·64 @16k',src:'v',locs:SRC.audioDec}]
+  ]);
+  N('voc',null,'Stereo vocoder + BWE','group',{params:'129.09M',src:'v',locs:SRC.vocoder});
+  N('voc.base','voc','SnakeBeta AMP vocoder','group',{params:'115.08M',src:'v',locs:SRC.vocoder});
+  N('voc.base.up','voc.base','Upsample rates 5·2·2·2·2·2','resample',{shape:'mel → stereo 16 kHz',src:'v',locs:SRC.vocoder});
+  N('voc.bwe','voc','Bandwidth extension generator','group',{params:'13.46M',src:'v',locs:SRC.vocoder});
+  N('voc.bwe.mel','voc.bwe','Recompute 64-bin mel','resample',{shape:'16 kHz waveform → mel',src:'v',locs:SRC.vocoder});
+  N('voc.bwe.gen','voc.bwe','SnakeBeta AMP BWE','resample',{shape:'stereo 48 kHz',src:'v',locs:SRC.vocoder});
+  N('out.vid',null,'Video frames','output',{shape:'F·H·W·3 chunks',src:'v',locs:SRC.videoDec});
+  N('out.aud',null,'Stereo audio 48 kHz','output',{shape:'2·N',src:'v',locs:SRC.output});
+
+  E('pipe.s2','pipe.adecode',{label:'final audio latent',src:'v',locs:SRC.pipelineCall});
+  E('pipe.adecode',ad.first,{kind:'cond',label:'calls',src:'v',locs:SRC.audioDec});
+  E(ad.last,'voc.base.up',{src:'v',locs:SRC.output});
+  E('voc.base.up','voc.bwe.mel',{src:'v',locs:SRC.vocoder});
+  E('voc.bwe.mel','voc.bwe.gen',{src:'v',locs:SRC.vocoder});
+  E('voc.bwe.gen','out.aud',{src:'v',locs:SRC.output});
+  E(vd.last,'out.vid',{src:'v',locs:SRC.videoDec});
+
+  reindex(G);
+  return G;
+}
+
+/* Build the default teaching map from the audited component inventory above.
+   Its parent pointers express semantic execution depth. Python class definitions
+   and exact runtime call sites remain available together in each node's sources. */
+function buildEducationalGraph(){
+  buildAccurateGraph();
+
+  G.meta={
+    name:'LTX 2.5 — one-stage BF16 educational data-flow map',
+    note:'The default recipe is full/dev BF16, one-stage T2V with joint audio-video '+
+         'denoising, CFG/STG guidance, and the diffusion video VAE. The image recipe '+
+         'adds frame-indexed image conditioning without replacing the base map.',
+    sourceRoot:'I:/dev/LTX-2',
+    repoUrl:'https://github.com/Lightricks/LTX-2',
+    repoRef:'7a0a3a7abe4bff45548ccdefbf973338ae38e883',
+    checkpoint:'full/dev transformer BF16 + Gemma 4 BF16 + diffusion video VAE BF16 + '+
+               'audio VAE BF16 + duration head BF16'
+  };
+
+  const removeRoots=new Set(['pipe.up','pipe.cond2','pipe.s2','pipe.vdecode','pipe.adecode','up']);
+  const underRemoved=n=>{ let cur=n;
+    while(cur){ if(removeRoots.has(cur.id)) return true; cur=cur.parent?byId[cur.parent]:null; }
+    return false;
+  };
+  const kill=new Set(G.nodes.filter(underRemoved).map(n=>n.id));
+  G.nodes=G.nodes.filter(n=>!kill.has(n.id));
+  G.edges=G.edges.filter(e=>!kill.has(e.from)&&!kill.has(e.to));
+  reindex(G);
+
+  const set=(id,o)=>Object.assign(byId[id],o);
+  set('pipe',{name:'One-stage guided AV denoising',note:'One target-resolution Euler diffusion stage using the full/dev transformer. No latent spatial upsampler and no second stage.',locs:[...SRC.oneStage,...SRC.oneStageCall]});
+  set('pipe.prompt',{parent:null,name:'Text prompt',shape:'str',kind:'input',locs:SRC.oneStageCall});
+  set('pipe.images',{parent:null,name:'Frame-indexed images (optional)',shape:'list[image, frame, strength, crf?]',kind:'input',locs:SRC.oneStageCall,variant:'image'});
+  set('pipe.seed',{parent:null,name:'Seed',shape:'int',kind:'input',params:'',locs:[...SRC.oneStageCall,...SRC.noiser]});
+  set('pipe.duration',{parent:null,name:'Output shape + timing',shape:'H · W · frames/duration · fps',kind:'ctrl',locs:[...SRC.oneStageCall,...SRC.duration]});
+  set('pipe.cond1',{parent:'venc',name:'Frame-indexed latent conditioning',shape:'latent + mask + strength',kind:'output',locs:SRC.imageCond});
+  set('pipe.s1',{name:'Euler denoising loop',shape:'video + audio LatentState',kind:'sample',note:'At every sigma, guidance passes are batched through one paired AV transformer call, split, combined, then used for the Euler update.',locs:[...SRC.stage,...SRC.sampler,...SRC.denoiser]});
+  set('venc',{name:'Image → video-latent conditioning',note:'Optional I2V/first-last/arbitrary-frame overlay. The pure T2V base supplies an empty image list.',variant:'image'});
+  set('dit',{parent:'pipe',name:'LTXModel — paired AV transformer',locs:SRC.model});
+  set('txt',{name:'Positive + negative prompt encoding',note:'PromptEncoder is called once with [prompt, negative_prompt] and returns positive and negative video/audio contexts.',locs:[...SRC.prompt,...SRC.oneStageCall]});
+  set('txt.connv.out',{name:'Video text contexts (+/−)',shape:'2 · B · T · 4096'});
+  set('txt.conna.out',{name:'Audio text contexts (+/−)',shape:'2 · B · T · 2048'});
+  set('vdec',{name:'Video latent → RGB frames'});
+  set('adec',{name:'Audio latent → mel features'});
+  set('voc',{name:'Mel features → stereo audio'});
+
+  N('pipe.negative',null,'Negative prompt','input',{shape:'str',src:'v',locs:SRC.oneStageCall,
+    note:'Encoded beside the positive prompt; its contexts drive the unconditional CFG pass.'});
+  N('noise.video',null,'Gaussian video-latent noise','sample',{shape:'B · 128 · f · h · w',src:'v',locs:[...SRC.noiser,...SRC.stage]});
+  N('noise.audio',null,'Gaussian audio-latent noise','sample',{shape:'B · 8 · Tₐ · 16',src:'v',locs:[...SRC.noiser,...SRC.stage]});
+
+  N('pipe.scheduler','pipe','LTX2 sigma schedule','ctrl',{shape:'num_steps + 1',src:'v',locs:[...SRC.scheduler,...SRC.oneStageCall]});
+  N('pipe.guidance','pipe','CFG + STG + modality guidance','group',{src:'v',locs:[...SRC.denoiser,...SRC.guider],
+    note:'The enabled passes are assembled as one batch. CFG uses negative text; STG skips selected self-attention blocks; modality guidance disables AV cross-attention.'});
+  N('pipe.guidance.cond','pipe.guidance','Conditional pass','ctrl',{shape:'positive AV contexts',src:'v',locs:SRC.denoiser});
+  N('pipe.guidance.uncond','pipe.guidance','Unconditional CFG pass','ctrl',{shape:'negative AV contexts',src:'v',locs:SRC.denoiser});
+  N('pipe.guidance.stg','pipe.guidance','Perturbed STG pass','ctrl',{shape:'skip selected self-attn blocks',src:'v',locs:SRC.denoiser});
+  N('pipe.guidance.mod','pipe.guidance','Isolated-modality pass','ctrl',{shape:'skip A2V + V2A cross-attn',src:'v',locs:SRC.denoiser});
+  N('pipe.guidance.batch','pipe.guidance','Batch AV states + pass contexts','resample',{shape:'n passes · B',src:'v',locs:SRC.denoiser});
+  N('pipe.guidance.combine','pipe.guidance','Split predictions + guider formula','add',{shape:'guided video + audio x₀',src:'v',locs:SRC.guider,
+    note:'cond + (cfg−1)(cond−uncond) + stg(cond−perturbed) + (modality−1)(cond−isolated), followed by optional rescaling.'});
+
+  reindex(G);
+
+  /* Remove the old two-stage stage wiring while retaining verified component-internal edges. */
+  const stageEndpoints=new Set(['pipe.s1','pipe.seed','pipe.duration','pipe.cond1','txt.connv.out','txt.conna.out','dit.vin','dit.ain','dit.vout','dit.aout']);
+  G.edges=G.edges.filter(e=>{
+    if(!stageEndpoints.has(e.from)||!stageEndpoints.has(e.to)) return true;
+    return !(['pipe.s1','pipe.seed','pipe.duration','pipe.cond1'].includes(e.from)||
+             ['pipe.s1'].includes(e.to));
+  });
+  E('pipe.negative','txt.tok',{label:'negative text',src:'v',locs:SRC.oneStageCall});
+  E('pipe.seed','noise.video',{label:'torch.Generator',src:'v',locs:[...SRC.oneStageCall,...SRC.noiser],views:['flow']});
+  E('pipe.seed','noise.audio',{label:'same generator',src:'v',locs:[...SRC.oneStageCall,...SRC.noiser],views:['flow']});
+  E('pipe.duration','noise.video',{kind:'cond',label:'video latent shape',src:'v',locs:SRC.stage,views:['flow']});
+  E('pipe.duration','noise.audio',{kind:'cond',label:'audio length from video',src:'v',locs:SRC.stage,views:['flow']});
+  E('noise.video','pipe.s1',{label:'initial video state',src:'v',locs:SRC.stage,views:['flow']});
+  E('noise.audio','pipe.s1',{label:'initial audio state',src:'v',locs:SRC.stage,views:['flow']});
+  E('pipe.duration','pipe.scheduler',{kind:'cond',label:'step count',src:'v',locs:SRC.oneStageCall,views:['flow']});
+  E('pipe.scheduler','pipe.s1',{kind:'cond',label:'sigmas',src:'v',locs:SRC.oneStageCall,views:['flow']});
+  E('pipe.cond1','pipe.s1',{label:'conditioned video tokens',src:'v',locs:[...SRC.imageCond,...SRC.oneStageCall],views:['flow']});
+
+  E('txt.connv.out','pipe.guidance.cond',{label:'positive video context',src:'v',locs:SRC.denoiser,views:['flow']});
+  E('txt.conna.out','pipe.guidance.cond',{label:'positive audio context',src:'v',locs:SRC.denoiser,views:['flow']});
+  E('txt.connv.out','pipe.guidance.uncond',{label:'negative video context',src:'v',locs:SRC.denoiser,views:['flow']});
+  E('txt.conna.out','pipe.guidance.uncond',{label:'negative audio context',src:'v',locs:SRC.denoiser,views:['flow']});
+  E('txt.connv.out','pipe.guidance.stg',{label:'positive video context',src:'v',locs:SRC.denoiser,views:['flow']});
+  E('txt.conna.out','pipe.guidance.stg',{label:'positive audio context',src:'v',locs:SRC.denoiser,views:['flow']});
+  E('txt.connv.out','pipe.guidance.mod',{label:'positive video context',src:'v',locs:SRC.denoiser,views:['flow']});
+  E('txt.conna.out','pipe.guidance.mod',{label:'positive audio context',src:'v',locs:SRC.denoiser,views:['flow']});
+  ['cond','uncond','stg','mod'].forEach(k=>E('pipe.guidance.'+k,'pipe.guidance.batch',{src:'v',locs:SRC.denoiser,views:['flow']}));
+  E('pipe.s1','pipe.guidance.batch',{label:'current AV states',src:'v',locs:SRC.denoiser,views:['flow']});
+  E('pipe.guidance.batch','dit.vin',{label:'batched video modality',src:'v',locs:SRC.denoiser,views:['flow']});
+  E('pipe.guidance.batch','dit.ain',{label:'batched audio modality',src:'v',locs:SRC.denoiser,views:['flow']});
+  E('dit.vout','pipe.guidance.combine',{label:'video pass predictions',src:'v',locs:SRC.denoiser,views:['flow']});
+  E('dit.aout','pipe.guidance.combine',{label:'audio pass predictions',src:'v',locs:SRC.denoiser,views:['flow']});
+  E('pipe.guidance.combine','pipe.s1',{kind:'residual',label:'guided Euler update',src:'v',locs:[...SRC.guider,...SRC.sampler],views:['flow']});
+
+  E('pipe.s1','vdec.denorm',{label:'final video latent',src:'v',locs:[...SRC.oneStageCall,...SRC.videoDec],views:['flow']});
+  E('pipe.seed','vdec.noise',{label:'decoder pixel noise',src:'v',locs:[...SRC.oneStageCall,...SRC.videoDec],views:['flow']});
+  E('pipe.s1','adec.denorm',{label:'final audio latent',src:'v',locs:[...SRC.oneStageCall,...SRC.audioDec],views:['flow']});
+
+  reindex(G);
+  return G;
+}
+/* ============================================================================
+   VIEW STATE + LAYOUT
+   ========================================================================== */
+const S = {
+  view:'flow', variant:'t2v', dir:'TB',
+  sel:new Set(), selEdge:null, kinds:new Set(['data']),
+  pan:{x:60,y:60}, zoom:.8,
+  search:'', hover:null,
+  connectFrom:null, connectPt:null,
+  marquee:null,
+  undo:[], redo:[]
+};
+
+const NODE_MINW=132, NODE_MAXW=252, NODE_H=40, NODE_H2=54;
+const HEADER=24, PAD=16, GAP_CROSS=26, GAP_DEPTH=46;
+
+function nodeActive(n){
+  let cur=n;
+  while(cur){
+    if(cur.variant && cur.variant!==S.variant) return false;
+    cur=cur.parent?byId[cur.parent]:null;
+  }
+  return true;
+}
+const rootIds = ()=>G.nodes.filter(n=>!n.parent&&nodeActive(n)).map(n=>n.id);
+const kidsOf  = id=>(id===null?rootIds():(byId[id]?byId[id].children:[])).filter(k=>nodeActive(byId[k]));
+
+function isOpen(n){ return n.open && n.children.length>0; }
+function depthOf(id){ let d=0,n=byId[id]; while(n&&n.parent){d++;n=byId[n.parent];} return d; }
+function ancestors(id){ const a=[]; let n=byId[id]; while(n&&n.parent){a.push(n.parent);n=byId[n.parent];} return a; }
+function isDescendant(id,anc){ return ancestors(id).indexOf(anc)>=0; }
+
+/* deepest ancestor-or-self that is actually drawn */
+function repOf(id){
+  const a = ancestors(id);            // nearest-first
+  for(let i=a.length-1;i>=0;i--){ if(!isOpen(byId[a[i]])) return a[i]; }
+  return id;
+}
+function liftTo(id,pid){
+  let n=byId[id];
+  while(n){ if((n.parent||null)===(pid||null)) return n.id; n=byId[n.parent]; }
+  return null;
+}
+
+/* ---------------- text metrics (cheap) ---------------- */
+let _mc=null;
+function textW(s,px){
+  if(!_mc){ _mc=document.createElement('canvas').getContext('2d'); }
+  _mc.font=px+'px ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,Arial';
+  return _mc.measureText(s).width;
+}
+
+/* ---------------- sizes ---------------- */
+let SZ=Object.create(null);
+function clearSizes(){ SZ=Object.create(null); }
+function sizeOf(id){
+  if(SZ[id]) return SZ[id];
+  const n=byId[id]; let s;
+  if(isOpen(n)){
+    let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+    for(const k of n.children){
+      const ks=sizeOf(k), kn=byId[k];
+      if(!nodeActive(kn)) continue;
+      const kx=kn.x+(ks.open?ks.ox:0), ky=kn.y+(ks.open?ks.oy:0);
+      x0=Math.min(x0,kx); y0=Math.min(y0,ky);
+      x1=Math.max(x1,kx+ks.w); y1=Math.max(y1,ky+ks.h);
+    }
+    if(x0>x1){x0=y0=0;x1=120;y1=40;}
+    const labw = textW(n.name,12)+ (n.params?textW(n.params,10)+16:0) + 74;
+    s={w:Math.max(x1-x0+PAD*2, labw), h:(y1-y0)+PAD+HEADER+PAD,
+       open:true,ox:x0,oy:y0};
+  }else{
+    const two = !!(n.shape||n.params||n.rep);
+    const w = Math.min(NODE_MAXW, Math.max(NODE_MINW,
+        Math.max(textW(n.name,12.5), textW(sub(n),10.5))+30));
+    s={w, h: two?NODE_H2:NODE_H, open:false};
+  }
+  SZ[id]=s; return s;
+}
+function sub(n){
+  const bits=[];
+  if(n.rep) bits.push('×'+n.rep);
+  if(n.shape) bits.push(n.shape);
+  if(n.params) bits.push(n.params);
+  if(!bits.length && n.children.length) bits.push(n.children.length+' nodes');
+  return bits.join('  ·  ');
+}
+
+/* absolute position of a node (in world space) */
+function absPos(id){
+  let x=0,y=0,n=byId[id];
+  while(n){ x+=n.x; y+=n.y;
+    const p=n.parent?byId[n.parent]:null;
+    if(p){ x+=PAD; y+=HEADER+PAD; }
+    n=p; }
+  return {x,y};
+}
+
+/* Visual top-left. Open groups hug the true child bounds; their logical origin
+   stays fixed, so moving a child left/up neither moves the child nor makes the
+   box grow in the opposite direction. This also composes for nested groups. */
+function drawPos(id){
+  const p=absPos(id), s=sizeOf(id);
+  return s.open?{x:p.x+s.ox,y:p.y+s.oy}:p;
+}
+
+/* ---------------- edge lifting for the current view ---------------- */
+function viewEdges(){
+  return G.edges.filter(e=>nodeActive(byId[e.from])&&nodeActive(byId[e.to])&&
+    (!e.views||e.views.indexOf(S.view)>=0) && S.kinds.has(e.kind||'data'));
+}
+/* trim a label to fit a pixel width */
+function fitText(s,px,max){
+  if(textW(s,px)<=max) return s;
+  let lo=0,hi=s.length;
+  while(lo<hi){ const m=(lo+hi)>>1; if(textW(s.slice(0,m)+'…',px)<=max) lo=m+1; else hi=m; }
+  return s.slice(0,Math.max(1,lo-1))+'…';
+}
+
+function internalEdges(pid){
+  const set=new Map();
+  for(const e of viewEdges()){
+    const a=liftTo(e.from,pid), b=liftTo(e.to,pid);
+    if(a&&b&&a!==b && e.kind!=='residual') set.set(a+'>'+b,[a,b]);
+  }
+  return [...set.values()];
+}
+
+/* ---------------- layered layout of one container ---------------- */
+function layoutChildren(pid){
+  const kids=kidsOf(pid);
+  if(!kids.length) return;
+  const idx=new Map(kids.map((k,i)=>[k,i]));
+  const es=internalEdges(pid).filter(([a,b])=>idx.has(a)&&idx.has(b));
+
+  // --- break cycles (DFS) ---
+  const out=new Map(kids.map(k=>[k,[]])), indeg=new Map(kids.map(k=>[k,0]));
+  const color=new Map(kids.map(k=>[k,0])), keep=[];
+  const adj=new Map(kids.map(k=>[k,[]]));
+  es.forEach(([a,b])=>adj.get(a).push(b));
+  (function(){
+    const dfs=(u)=>{ color.set(u,1);
+      for(const v of adj.get(u)){ const c=color.get(v);
+        if(c===1) continue;              // back edge -> drop
+        keep.push([u,v]); if(c===0) dfs(v); }
+      color.set(u,2); };
+    kids.forEach(k=>{ if(color.get(k)===0) dfs(k); });
+  })();
+  const seen=new Set();
+  keep.forEach(([a,b])=>{ const k=a+'>'+b; if(seen.has(k))return; seen.add(k);
+    out.get(a).push(b); indeg.set(b,indeg.get(b)+1); });
+
+  // --- longest-path layering ---
+  const layer=new Map(kids.map(k=>[k,0]));
+  const q=kids.filter(k=>indeg.get(k)===0);
+  const deg=new Map(indeg);
+  for(let i=0;i<q.length;i++){ const u=q[i];
+    for(const v of out.get(u)){
+      layer.set(v,Math.max(layer.get(v),layer.get(u)+1));
+      deg.set(v,deg.get(v)-1); if(deg.get(v)===0) q.push(v); } }
+
+  const L=[]; kids.forEach(k=>{ const l=layer.get(k); (L[l]=L[l]||[]).push(k); });
+
+  // --- ordering: barycentre sweeps ---
+  const pred=new Map(kids.map(k=>[k,[]]));
+  out.forEach((vs,u)=>vs.forEach(v=>pred.get(v).push(u)));
+  const posIn=new Map();
+  const reindexOrder=()=>L.forEach(row=>row&&row.forEach((k,i)=>posIn.set(k,i)));
+  reindexOrder();
+  for(let it=0;it<6;it++){
+    const down=it%2===0;
+    for(let li=down?1:L.length-2; down? li<L.length : li>=0; down?li++:li--){
+      const row=L[li]; if(!row) continue;
+      const bary=k=>{ const ns=(down?pred.get(k):out.get(k)).filter(x=>posIn.has(x));
+        return ns.length? ns.reduce((s,x)=>s+posIn.get(x),0)/ns.length : posIn.get(k); };
+      row.sort((a,b)=>bary(a)-bary(b));
+      reindexOrder();
+    }
+  }
+
+  // --- coordinates ---
+  const cs=k=>S.dir==='TB'?sizeOf(k).w:sizeOf(k).h;
+  const ds=k=>S.dir==='TB'?sizeOf(k).h:sizeOf(k).w;
+  const cross=new Map(), depth=new Map();
+  let d=0;
+  L.forEach(row=>{ if(!row) return;
+    const hmax=Math.max(...row.map(ds));
+    row.forEach(k=>depth.set(k,d+(hmax-ds(k))/2));
+    d+=hmax+GAP_DEPTH; });
+
+  // initial packing
+  L.forEach(row=>{ if(!row) return; let c=0;
+    row.forEach(k=>{ cross.set(k,c); c+=cs(k)+GAP_CROSS; }); });
+  // median alignment passes
+  for(let it=0;it<8;it++){
+    const down=it%2===0;
+    for(let li=0; li<L.length; li++){
+      const row=L[down?li:L.length-1-li]; if(!row||!row.length) continue;
+      const want=row.map(k=>{
+        const ns=(down?pred.get(k):out.get(k)).filter(x=>cross.has(x));
+        if(!ns.length) return cross.get(k);
+        const m=ns.map(x=>cross.get(x)+cs(x)/2).sort((a,b)=>a-b);
+        return m[Math.floor(m.length/2)] - cs(k)/2;
+      });
+      // left->right push
+      let acc=-1e9;
+      row.forEach((k,i)=>{ const v=Math.max(want[i],acc); cross.set(k,v); acc=v+cs(k)+GAP_CROSS; });
+      // right->left pull back toward want
+      acc=1e9;
+      for(let i=row.length-1;i>=0;i--){ const k=row[i];
+        const v=Math.min(Math.max(cross.get(k),want[i]),acc-cs(k));
+        cross.set(k,v); acc=v-GAP_CROSS; }
+    }
+  }
+
+  // write to nodes (honouring pins)
+  const pins=new Map();
+  kids.forEach(k=>{ const n=byId[k]; if(n.pinned) pins.set(k,{x:n.x,y:n.y}); });
+  kids.forEach(k=>{ const n=byId[k];
+    if(S.dir==='TB'){ n.x=cross.get(k); n.y=depth.get(k); }
+    else { n.x=depth.get(k); n.y=cross.get(k); } });
+  pins.forEach((p,k)=>{ byId[k].x=p.x; byId[k].y=p.y; });
+
+  // normalise to origin
+  let mx=1e9,my=1e9;
+  kids.forEach(k=>{ mx=Math.min(mx,byId[k].x); my=Math.min(my,byId[k].y); });
+  kids.forEach(k=>{ byId[k].x-=mx; byId[k].y-=my; });
+}
+
+/* full bottom-up layout */
+function layoutAll(unpin){
+  if(unpin) G.nodes.forEach(n=>n.pinned=false);
+  clearSizes();
+  const order=[];
+  (function walk(id){ kidsOf(id).forEach(walk); order.push(id); })(null);
+  order.forEach(id=>{ if(kidsOf(id).length) layoutChildren(id); });
+  clearSizes();
+}
+/* ============================================================================
+   RENDER
+   ========================================================================== */
+const svg=document.getElementById('svg');
+const KCOL={group:'--k-group',input:'--k-input',output:'--k-out',conv:'--k-conv',
+  norm:'--k-norm',act:'--k-act',attn:'--k-attn',mlp:'--k-mlp',linear:'--k-linear',
+  add:'--k-add',sample:'--k-sample',ctrl:'--k-ctrl',embed:'--k-embed',resample:'--k-resample'};
+const kcol=k=>'var('+(KCOL[k]||'--k-group')+')';
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const PROV={v:['#22c55e','verified in code / checkpoint'],i:['#f59e0b','semantic aggregation'],p:['none','unverified']};
+
+function cleanSource(loc){
+  if(!loc||!loc.path) return null;
+  const path=String(loc.path).replace(/\\/g,'/');
+  if(path.startsWith('/')||/^[A-Za-z]:/.test(path)||path.split('/').includes('..')) return null;
+  const line=Math.max(1,Math.floor(+loc.line||1));
+  return {label:String(loc.label||loc.symbol||'Source'),path,line,symbol:String(loc.symbol||''),
+    localOnly:path.startsWith('hf_metadata/')};
+}
+function sourceAbsolute(loc){
+  const root=String((G.meta&&G.meta.sourceRoot)||'').replace(/\\/g,'/').replace(/\/$/,'');
+  return root ? root+'/'+loc.path : loc.path;
+}
+function sourceUrl(loc,mode){
+  loc=cleanSource(loc); if(!loc) return null;
+  if(mode==='local') return 'vscode://file/'+encodeURI(sourceAbsolute(loc))+':'+loc.line+':1';
+  if(mode==='github'){
+    if(loc.localOnly) return null;
+    const repo=String((G.meta&&G.meta.repoUrl)||'').replace(/\/$/,'');
+    if(!/^https?:\/\//i.test(repo)) return null;
+    const ref=encodeURIComponent(String((G.meta&&G.meta.repoRef)||'main'));
+    return repo+'/blob/'+ref+'/'+loc.path.split('/').map(encodeURIComponent).join('/')+'#L'+loc.line;
+  }
+  return null;
+}
+function copyText(s){
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(()=>toast('source path copied')).catch(()=>fallback());
+  else fallback();
+  function fallback(){ const a=document.createElement('textarea'); a.value=s; document.body.appendChild(a);
+    a.select(); document.execCommand('copy'); a.remove(); toast('source path copied'); }
+}
+function sourceHtml(owner){
+  const locs=(owner&&Array.isArray(owner.locs)?owner.locs:[]).map(cleanSource).filter(Boolean);
+  if(!locs.length) return '';
+  return `<div class="f"><label>Source code</label></div><div class="sources">${locs.map((l,i)=>`
+    <div class="source"><div class="sl">${esc(l.label)}${l.symbol?` · <span class="mono">${esc(l.symbol)}</span>`:''}</div>
+      <div class="sp">${esc(l.path)}:${l.line}</div><div class="sa">
+        <button class="btn" data-src-mode="local" data-src-i="${i}">VS Code</button>
+        <button class="btn" data-src-mode="github" data-src-i="${i}" ${l.localOnly?'disabled title="Local-only evidence"':''}>GitHub</button>
+        <button class="btn" data-src-mode="copy" data-src-i="${i}">Copy</button>
+      </div></div>`).join('')}</div>`;
+}
+function bindSources(el,owner){
+  const locs=(owner&&Array.isArray(owner.locs)?owner.locs:[]).map(cleanSource).filter(Boolean);
+  el.querySelectorAll('[data-src-mode]').forEach(b=>b.onclick=()=>{
+    const loc=locs[+b.dataset.srcI], mode=b.dataset.srcMode;
+    if(!loc) return toast('invalid source location');
+    if(mode==='copy') return copyText(loc.path+':'+loc.line);
+    const url=sourceUrl(loc,mode); if(!url) return toast('source target is not configured');
+    if(mode==='github') window.open(url,'_blank','noopener'); else window.location.href=url;
+  });
+}
+
+function visibleList(){
+  const groups=[], leaves=[];
+  (function walk(id,d){
+    for(const k of kidsOf(id)){
+      const n=byId[k];
+      if(isOpen(n)){ groups.push([k,d]); walk(k,d+1); } else leaves.push(k);
+    }
+  })(null,0);
+  return {groups,leaves};
+}
+
+function port(id,side){
+  const p=drawPos(id), s=sizeOf(id);
+  if(S.dir==='TB') return side==='out'?{x:p.x+s.w/2,y:p.y+s.h}:{x:p.x+s.w/2,y:p.y};
+  return side==='out'?{x:p.x+s.w,y:p.y+s.h/2}:{x:p.x,y:p.y+s.h/2};
+}
+function edgePath(a,b,bend){
+  const dx=b.x-a.x, dy=b.y-a.y;
+  if(S.dir==='TB'){
+    const d=Math.max(26,Math.abs(dy)*.45);
+    if(dy< 8){ const off=Math.max(60,Math.abs(dx)*.4+70)*(bend?1:-1);
+      return `M${a.x},${a.y} C${a.x+off},${a.y+40} ${b.x+off},${b.y-40} ${b.x},${b.y}`; }
+    return `M${a.x},${a.y} C${a.x},${a.y+d} ${b.x},${b.y-d} ${b.x},${b.y}`;
+  }else{
+    const d=Math.max(26,Math.abs(dx)*.45);
+    if(dx< 8){ const off=Math.max(60,Math.abs(dy)*.4+70)*(bend?1:-1);
+      return `M${a.x},${a.y} C${a.x+40},${a.y+off} ${b.x-40},${b.y+off} ${b.x},${b.y}`; }
+    return `M${a.x},${a.y} C${a.x+d},${a.y} ${b.x-d},${b.y} ${b.x},${b.y}`;
+  }
+}
+
+let liftedEdges=[];
+function computeEdges(){
+  const m=new Map();
+  for(const e of viewEdges()){
+    const a=repOf(e.from), b=repOf(e.to);
+    if(a===b) continue;
+    const key=a+'>'+b+'|'+e.kind;
+    if(m.has(key)){ m.get(key).ids.push(e.id); if(e.label&&!m.get(key).label) m.get(key).label=e.label; continue; }
+    m.set(key,{a,b,kind:e.kind,label:e.label,ids:[e.id],
+      lifted:(a!==e.from||b!==e.to), src:e.src,
+      sa:byId[e.from].shape, sb:byId[e.to].shape});
+  }
+  liftedEdges=[...m.values()];
+  return liftedEdges;
+}
+
+function render(){
+  clearSizes();
+  const {groups,leaves}=visibleList();
+  const edges=computeEdges();
+  const q=S.search.trim().toLowerCase();
+  const hit=id=>q && (byId[id].name.toLowerCase().includes(q)||id.toLowerCase().includes(q));
+
+  let gs='', es='', ns='';
+
+  /* group boxes */
+  for(const [id,d] of groups){
+    const n=byId[id], p=drawPos(id), s=sizeOf(id);
+    const c=kcol(n.kind==='group'?'group':n.kind);
+    const selc=S.sel.has(id)?' sel':'';
+    gs+=`<g class="gp${selc}" data-id="${id}" transform="translate(${p.x},${p.y})">
+      <rect class="gbox" width="${s.w}" height="${s.h}" rx="9" style="--gc:${c}"
+        fill="rgba(255,255,255,${0.018+d*0.014})" stroke="${S.sel.has(id)?'var(--sel)':c}"
+        stroke-opacity="${S.sel.has(id)?1:.42}" stroke-width="${S.sel.has(id)?2:1.2}"/>
+      <rect class="ghd" width="${s.w}" height="${HEADER}" rx="9" fill="${c}" fill-opacity=".16"/>
+      <rect y="${HEADER-9}" width="${s.w}" height="9" fill="${c}" fill-opacity=".16"/>
+      <text class="chev" x="11" y="16.5" fill="${c}" font-size="9">▼</text>
+      <text x="24" y="16.5" font-size="11.5" font-weight="600" fill="var(--txt)">${esc(fitText(n.name,11.5,s.w-40))}</text>
+      <text x="${s.w-10}" y="16.5" text-anchor="end" font-size="9.5" fill="var(--dim2)">${esc(fitText(sub(n),9.5,Math.max(0,s.w-46-textW(n.name,11.5))))}</text>
+      ${hit(id)?`<rect width="${s.w}" height="${s.h}" rx="9" fill="none" stroke="var(--acc)" stroke-width="2"/>`:''}
+    </g>`;
+  }
+
+  /* edges */
+  const showLbl=S.zoom>.55;
+  for(const e of edges){
+    const A=port(e.a,'out'), B=port(e.b,'in');
+    const back = (S.dir==='TB'? B.y<A.y : B.x<A.x);
+    const d=edgePath(A,B,back);
+    const selE = S.selEdge && e.ids.indexOf(S.selEdge)>=0;
+    let col='#59647a', dash='', wdt=1.4, mk='ar';
+    if(e.kind==='cond'){ col='#c08a2e'; dash='4 4'; mk='arc'; }
+    if(e.kind==='residual'){ col='#6d7f9c'; dash='2 5'; mk='arr'; }
+    if(selE){ col='var(--sel)'; wdt=2.4; }
+    if(e.lifted) wdt+=.6;
+    es+=`<path d="${d}" fill="none" stroke="${col}" stroke-width="${wdt}" ${dash?`stroke-dasharray="${dash}"`:''} marker-end="url(#${selE?'ars':mk})" opacity="${selE?1:.9}"/>`;
+    es+=`<path class="ehit" data-eid="${e.ids[0]}" d="${d}" fill="none" stroke="transparent" stroke-width="14"/>`;
+    if(showLbl){
+      const mid={x:(A.x+B.x)/2,y:(A.y+B.y)/2};
+      let txt=e.label;
+      if(!txt && e.sa && e.sb && e.sa!==e.sb) txt=e.sb;
+      if(txt){
+        const w=textW(txt,9)+10;
+        es+=`<g transform="translate(${mid.x-w/2},${mid.y-8})">
+          <rect width="${w}" height="15" rx="7" fill="#0f1115" stroke="${col}" stroke-opacity=".5"/>
+          <text x="${w/2}" y="10.6" text-anchor="middle" font-size="9" fill="var(--dim)"
+            font-family="ui-monospace,Menlo,monospace">${esc(txt)}</text></g>`;
+      }
+    }
+  }
+
+  /* leaf / collapsed nodes */
+  for(const id of leaves){
+    const n=byId[id], p=drawPos(id), s=sizeOf(id);
+    const c=kcol(n.kind), sl=S.sel.has(id), two=s.h===NODE_H2;
+    const pv=PROV[n.src]||PROV.p;
+    ns+=`<g class="nd${sl?' sel':''}" data-id="${id}" transform="translate(${p.x},${p.y})">
+      <rect width="${s.w}" height="${s.h}" rx="6" fill="#1a1f28"
+        stroke="${sl?'var(--sel)':'#333c4a'}" stroke-width="${sl?2:1}"/>
+      <rect width="4" height="${s.h}" rx="2" fill="${c}"/>
+      <rect x="4" width="${s.w-4}" height="${s.h}" rx="6" fill="${c}" fill-opacity=".07"/>
+      <text x="13" y="${two?18:24}" font-size="12" fill="var(--txt)">${esc(fitText(n.name,12,s.w-30))}</text>
+      ${two?`<text x="13" y="34" font-size="10" fill="var(--dim2)"
+        font-family="ui-monospace,Menlo,monospace">${esc(fitText(sub(n),10,s.w-30))}</text>`:''}
+      ${n.children.length?`<text class="chev" x="${s.w-13}" y="${s.h/2+4}" text-anchor="end"
+        font-size="9" fill="${c}">▶</text>`:''}
+      <circle cx="${s.w-(n.children.length?24:11)}" cy="10.5" r="3.2" fill="${pv[0]}"
+        stroke="${pv[0]==='none'?'#4b5563':'none'}"/>
+      ${hit(id)?`<rect width="${s.w}" height="${s.h}" rx="6" fill="none" stroke="var(--acc)" stroke-width="2"/>`:''}
+    </g>`;
+  }
+
+  /* connect-drag ghost + marquee + out-port handles */
+  let ov='';
+  S.sel.forEach(id=>{
+    if(!byId[id]) return;
+    if(ancestors(id).some(a=>!isOpen(byId[a]))) return;   // not visible
+    const o=port(id,'out');
+    ov+=`<g data-port="${id}" style="cursor:crosshair">
+      <circle cx="${o.x}" cy="${o.y}" r="13" fill="transparent"/>
+      <circle cx="${o.x}" cy="${o.y}" r="6" fill="#0f1115" stroke="var(--acc)" stroke-width="2"/>
+      <circle cx="${o.x}" cy="${o.y}" r="2" fill="var(--acc)"/></g>`;
+  });
+  if(S.connectFrom && S.connectPt){
+    const A=port(S.connectFrom,'out');
+    ov+=`<path d="${edgePath(A,S.connectPt,false)}" fill="none" stroke="var(--acc)"
+      stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ara)" pointer-events="none"/>`;
+  }
+  if(S.marquee){ const m=S.marquee;
+    ov+=`<rect x="${Math.min(m.x0,m.x1)}" y="${Math.min(m.y0,m.y1)}" pointer-events="none"
+      width="${Math.abs(m.x1-m.x0)}" height="${Math.abs(m.y1-m.y0)}"
+      fill="rgba(77,208,225,.09)" stroke="var(--acc)" stroke-dasharray="4 3"/>`; }
+
+  const mk=(id,col)=>`<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5"
+      markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 z" fill="${col}"/></marker>`;
+  svg.innerHTML=`<defs>${mk('ar','#59647a')}${mk('arc','#c08a2e')}${mk('arr','#6d7f9c')}
+    ${mk('ars','#ffcc4d')}${mk('ara','#4dd0e1')}</defs>
+    <g id="world" transform="translate(${S.pan.x},${S.pan.y}) scale(${S.zoom})">
+      <g id="lg">${gs}</g><g id="le">${es}</g><g id="ln">${ns}</g><g id="lo">${ov}</g>
+    </g>`;
+
+  document.getElementById('hudZoom').textContent=Math.round(S.zoom*100)+'%';
+  const nv=leaves.length+groups.length;
+  document.getElementById('hudInfo').textContent=
+    `${nv} visible · ${G.nodes.length} nodes · ${edges.length} links`+
+    (S.sel.size?` · ${S.sel.size} selected`:'');
+  renderTree(); renderInspector();
+}
+
+/* ---------------- hierarchy panel ---------------- */
+function renderTree(){
+  const q=S.search.trim().toLowerCase();
+  let h='';
+  (function walk(id,d){
+    for(const k of kidsOf(id)){
+      const n=byId[k], has=n.children.length>0;
+      const m=q&&(n.name.toLowerCase().includes(q)||k.toLowerCase().includes(q));
+      h+=`<div class="tw${S.sel.has(k)?' sel':''}" data-tid="${k}"
+        style="padding-left:${6+d*13}px${m?';color:var(--acc)':''}">
+        <span class="tg" data-tog="${k}">${has?(n.open?'▼':'▶'):''}</span>
+        <span class="dot" style="background:${kcol(n.kind)}"></span>
+        <span class="nm">${esc(n.name)}</span>
+        ${n.rep?`<span class="ct">×${n.rep}</span>`:(has?`<span class="ct">${n.children.length}</span>`:'')}
+      </div>`;
+      if(n.open&&has) walk(k,d+1);
+    }
+  })(null,0);
+  document.getElementById('tree').innerHTML=h;
+}
+
+/* ---------------- inspector ---------------- */
+function renderInspector(){
+  const el=document.getElementById('insp');
+  if(S.selEdge){
+    const e=G.edges.find(x=>x.id===S.selEdge);
+    if(e){ el.innerHTML=`
+      <div class="f"><label>Connection</label>
+        <div class="mono" style="font-size:11px;color:var(--dim)">${esc(e.from)}<br>↓<br>${esc(e.to)}</div></div>
+      <div class="f"><label>Kind</label><select id="i_ekind">
+        ${['data','cond','residual'].map(k=>`<option ${e.kind===k?'selected':''}>${k}</option>`).join('')}
+      </select></div>
+      <div class="f"><label>Label</label><input id="i_elabel" value="${esc(e.label)}"></div>
+      <div class="f"><label>Shown in</label><select id="i_eviews">
+        <option value="arch,flow" ${(e.views||[]).length===2?'selected':''}>both views</option>
+        <option value="arch" ${String(e.views)==='arch'?'selected':''}>architecture only</option>
+        <option value="flow" ${String(e.views)==='flow'?'selected':''}>data flow only</option>
+      </select></div>
+      ${sourceHtml(e)}
+      <div class="f"><button class="btn" id="i_edel" style="width:100%">Delete connection</button></div>`;
+      el.querySelector('#i_ekind').onchange=ev=>{push();e.kind=ev.target.value;render();};
+      el.querySelector('#i_elabel').oninput=ev=>{e.label=ev.target.value;render();};
+      el.querySelector('#i_eviews').onchange=ev=>{push();e.views=ev.target.value.split(',');render();};
+      el.querySelector('#i_edel').onclick=()=>{push();G.edges=G.edges.filter(x=>x.id!==e.id);
+        S.selEdge=null;render();};
+      bindSources(el,e);
+      return; }
+  }
+  if(S.sel.size!==1){
+    el.innerHTML=`<div class="hint">
+      ${S.sel.size>1?`<b>${S.sel.size} nodes selected.</b><br>
+        <kbd>G</kbd> group them · <kbd>Del</kbd> delete<br><br>`:''}
+      <b>Navigate</b><br>
+      Click a node's <b>▶</b> (or double-click it) to open one level down. Groups expand
+      in place without moving their siblings.<br><br>
+      <b>Depth 1-4 / All</b> opens every group down to that level at once.<br><br>
+      <b>Auto-layout</b> is the only control that recomputes node positions.<br><br>
+      <b>Data flow</b> shows runtime tensors. <b>Architecture</b> keeps component
+      wiring while omitting pipeline-only loops; literal Python hierarchy is available
+      through each selected node's source links.<br><br>
+      <b>Source navigation</b><br>
+      Select one node or wire, then use its <b>VS Code</b>, <b>GitHub</b>, or <b>Copy</b>
+      source controls here.<br><br>
+      <b>Edit</b><br>
+      Drag a node to pin it · drag from its bottom edge to another node to connect ·
+      <kbd>A</kbd> add · <kbd>G</kbd>/<kbd>⇧G</kbd> group/ungroup · <kbd>Z</kbd> undo.
+      <br><br><b>Dots</b> ● green = verified in code/checkpoint,
+      ● amber = semantic aggregation, ○ hollow = unverified.
+      </div>
+      <div class="chips">
+        ${['Encoder','DiT','Decoder','Attn','Conv','RoPE'].map(c=>`<span class="chip" data-q="${c}">${c}</span>`).join('')}
+      </div>`;
+    el.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+      document.getElementById('search').value=c.dataset.q; S.search=c.dataset.q; render(); });
+    return;
+  }
+  const n=byId[[...S.sel][0]];
+  const kids=n.children.length;
+  el.innerHTML=`
+   <div class="f"><label>Name</label><input id="i_name" value="${esc(n.name)}"></div>
+   <div class="f row">
+     <div><label>Kind</label><select id="i_kind">
+       ${KINDS.map(k=>`<option ${n.kind===k?'selected':''}>${k}</option>`).join('')}</select></div>
+     <div><label>Provenance</label><select id="i_src">
+       <option value="v" ${n.src==='v'?'selected':''}>verified</option>
+       <option value="i" ${n.src==='i'?'selected':''}>semantic aggregation</option>
+       <option value="p" ${n.src==='p'?'selected':''}>unverified</option>
+     </select></div>
+   </div>
+   <div class="f"><label>Output shape</label><input id="i_shape" class="mono" value="${esc(n.shape)}"></div>
+   <div class="f row">
+     <div><label>Params</label><input id="i_params" value="${esc(n.params)}"></div>
+     <div><label>Repeat ×</label><input id="i_rep" type="number" min="0" value="${n.rep||0}"></div>
+   </div>
+   <div class="f"><label>Note</label><textarea id="i_note">${esc(n.note)}</textarea></div>
+   <div class="f"><label>Graph ID</label>
+     <div class="mono" style="font-size:10.5px;color:var(--dim2);word-break:break-all">${esc(n.id)}</div></div>
+   ${sourceHtml(n)}
+   <div class="f row">
+     <div><button class="btn" id="i_tog" style="width:100%">${kids?(n.open?'Collapse':'Open ('+kids+')'):'no children'}</button></div>
+     <div><button class="btn${n.pinned?' on':''}" id="i_pin" style="width:100%">${n.pinned?'Pinned':'Pin pos'}</button></div>
+   </div>
+   <div class="f row">
+     <div><button class="btn" id="i_child" style="width:100%">+ Child</button></div>
+     <div><button class="btn" id="i_del" style="width:100%">Delete</button></div>
+   </div>
+   <div class="f"><label>Connections</label>
+     <div style="font-size:11px;color:var(--dim)">
+       ${G.edges.filter(e=>e.to===n.id).map(e=>`↑ ${esc(byId[e.from].name)}`).join('<br>')||'<i>no inputs</i>'}
+       <div style="height:5px"></div>
+       ${G.edges.filter(e=>e.from===n.id).map(e=>`↓ ${esc(byId[e.to].name)}`).join('<br>')||'<i>no outputs</i>'}
+     </div></div>`;
+  const bind=(sel,f,ev)=>{const q=el.querySelector(sel); if(q) q[ev||'oninput']=f;};
+  bind('#i_name',e=>{n.name=e.target.value;render();});
+  bind('#i_kind',e=>{push();n.kind=e.target.value;render();},'onchange');
+  bind('#i_src',e=>{push();n.src=e.target.value;render();},'onchange');
+  bind('#i_shape',e=>{n.shape=e.target.value;render();});
+  bind('#i_params',e=>{n.params=e.target.value;render();});
+  bind('#i_rep',e=>{n.rep=+e.target.value||0;render();});
+  bind('#i_note',e=>{n.note=e.target.value;});
+  bind('#i_tog',()=>toggleOpen(n.id),'onclick');
+  bind('#i_pin',()=>{push();n.pinned=!n.pinned;render();},'onclick');
+  bind('#i_child',()=>addNode(n.id),'onclick');
+  bind('#i_del',()=>deleteSel(),'onclick');
+  bindSources(el,n);
+}
+/* ============================================================================
+   COMMANDS
+   ========================================================================== */
+function snapshot(){ return JSON.stringify(G,(k,v)=>k==='children'?undefined:v); }
+function restore(s){ G=JSON.parse(s); reindex(G); }
+function push(){ S.undo.push(snapshot()); if(S.undo.length>80)S.undo.shift(); S.redo.length=0; }
+function undo(){ if(!S.undo.length)return toast('nothing to undo');
+  S.redo.push(snapshot()); restore(S.undo.pop()); S.sel.clear(); S.selEdge=null; render(); }
+function redo(){ if(!S.redo.length)return toast('nothing to redo');
+  S.undo.push(snapshot()); restore(S.redo.pop()); S.sel.clear(); S.selEdge=null; render(); }
+
+let _t;
+function toast(m){ const t=document.getElementById('toast');
+  t.textContent=m; t.classList.add('show'); clearTimeout(_t);
+  _t=setTimeout(()=>t.classList.remove('show'),1500); }
+
+function toggleOpen(id){
+  const n=byId[id]; if(!n.children.length) return toast('leaf node — nothing below');
+  push(); n.open=!n.open; render();
+}
+function openToLevel(L){
+  push();
+  G.nodes.forEach(n=>{ n.open = n.children.length>0 && depthOf(n.id) <= L-2; });
+  render();
+}
+function uid(base){ let i=1,id=base; while(byId[id]) id=base+'_'+(++i); return id; }
+
+/* Place authored nodes without invoking auto-layout. New nodes start after the
+   existing contents of their container and can then be dragged into place. */
+function nextFreePosition(parent){
+  const kids=kidsOf(parent);
+  if(!kids.length) return {x:0,y:0};
+  clearSizes();
+  if(S.dir==='TB') return {x:0,y:Math.max(...kids.map(k=>byId[k].y+sizeOf(k).h))+GAP_DEPTH};
+  return {x:Math.max(...kids.map(k=>byId[k].x+sizeOf(k).w))+GAP_DEPTH,y:0};
+}
+
+function addNode(parent){
+  push();
+  const id=uid((parent?parent+'.':'')+'new');
+  const pos=nextFreePosition(parent||null);
+  G.nodes.push({id,parent:parent||null,name:'new node',kind:'linear',shape:'',params:'',
+    note:'',src:'p',rep:0,open:false,pinned:false,x:pos.x,y:pos.y,locs:[]});
+  reindex(G);
+  if(parent&&!byId[parent].open) byId[parent].open=true;
+  S.sel=new Set([id]); S.selEdge=null; render();
+  toast('added — rename it in the inspector');
+}
+function deleteSel(){
+  if(!S.sel.size) return;
+  push();
+  const kill=new Set();
+  S.sel.forEach(id=>{ kill.add(id); G.nodes.forEach(n=>{ if(isDescendant(n.id,id)) kill.add(n.id); }); });
+  G.nodes=G.nodes.filter(n=>!kill.has(n.id));
+  G.edges=G.edges.filter(e=>!kill.has(e.from)&&!kill.has(e.to));
+  reindex(G); S.sel.clear();
+  render(); toast(kill.size+' node(s) deleted');
+}
+function groupSel(){
+  if(S.sel.size<1) return toast('select nodes first');
+  const ids=[...S.sel];
+  const p=byId[ids[0]].parent||null;
+  if(ids.some(i=>(byId[i].parent||null)!==p)) return toast('selection must share one parent');
+  push();
+  const gid=uid((p?p+'.':'')+'grp');
+  const gx=Math.min(...ids.map(i=>byId[i].x))-PAD;
+  const gy=Math.min(...ids.map(i=>byId[i].y))-HEADER-PAD;
+  G.nodes.push({id:gid,parent:p,name:'New group',kind:'group',shape:'',params:'',note:'',
+    src:'p',rep:0,open:true,pinned:false,x:gx,y:gy,locs:[]});
+  ids.forEach(i=>{ const n=byId[i]; n.x-=gx+PAD; n.y-=gy+HEADER+PAD; n.parent=gid; });
+  reindex(G); S.sel=new Set([gid]); render(); toast('grouped');
+}
+function ungroupSel(){
+  const gs=[...S.sel].filter(i=>byId[i].children.length);
+  if(!gs.length) return toast('select a group');
+  push();
+  gs.forEach(gid=>{ const g=byId[gid], p=g.parent||null;
+    g.children.slice().forEach(c=>{ const n=byId[c];
+      n.x+=g.x+PAD; n.y+=g.y+HEADER+PAD; n.parent=p; });
+    G.nodes=G.nodes.filter(n=>n.id!==gid);
+    G.edges=G.edges.filter(e=>e.from!==gid&&e.to!==gid);
+    reindex(G); });
+  S.sel.clear(); render(); toast('ungrouped');
+}
+function connect(a,b){
+  if(a===b||isDescendant(b,a)||isDescendant(a,b)) return toast('invalid connection');
+  if(G.edges.some(e=>e.from===a&&e.to===b)) return toast('already connected');
+  push();
+  G.edges.push({id:'e'+Date.now().toString(36),from:a,to:b,kind:'data',label:'',
+    views:['arch','flow'],src:'p',locs:[]});
+  render(); toast('connected');
+}
+
+/* ---------------- viewport ---------------- */
+function bboxAll(){
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  clearSizes();
+  rootIds().forEach(id=>{ const p=drawPos(id),s=sizeOf(id);
+    x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x+s.w);y1=Math.max(y1,p.y+s.h); });
+  if(x0>x1) return {x:0,y:0,w:100,h:100};
+  return {x:x0,y:y0,w:x1-x0,h:y1-y0};
+}
+function bboxNode(id){ clearSizes(); const p=drawPos(id),s=sizeOf(id);
+  return {x:p.x-30,y:p.y-30,w:s.w+60,h:s.h+60}; }
+function fitBox(b){
+  const r=svg.getBoundingClientRect();
+  S.zoom=Math.max(.05,Math.min((r.width-60)/b.w,(r.height-60)/b.h,1.6));
+  S.pan.x=(r.width-b.w*S.zoom)/2-b.x*S.zoom;
+  S.pan.y=(r.height-b.h*S.zoom)/2-b.y*S.zoom;
+  render();
+}
+function fit(silent){
+  const one = S.sel.size===1 ? [...S.sel][0] : null;
+  const useSel = one && byId[one] && !ancestors(one).some(a=>!isOpen(byId[a]));
+  fitBox(useSel? bboxNode(one) : bboxAll());
+  if(!silent) toast(useSel?'fit to selection':'fit all');
+}
+function centerOn(id){
+  clearSizes(); const p=drawPos(id),s=sizeOf(id),r=svg.getBoundingClientRect();
+  S.pan.x=r.width/2-(p.x+s.w/2)*S.zoom;
+  S.pan.y=r.height/2-(p.y+s.h/2)*S.zoom;
+  render();
+}
+function focusNode(id){
+  ancestors(id).forEach(a=>{ if(byId[a].children.length) byId[a].open=true; });
+  clearSizes();
+  const p=drawPos(id),s=sizeOf(id),r=svg.getBoundingClientRect();
+  S.zoom=Math.min(1.3,Math.max(S.zoom,.7));
+  S.pan.x=r.width/2-(p.x+s.w/2)*S.zoom;
+  S.pan.y=r.height/2-(p.y+s.h/2)*S.zoom;
+  S.sel=new Set([id]); S.selEdge=null; render();
+}
+const toWorld=(cx,cy)=>{ const r=svg.getBoundingClientRect();
+  return {x:(cx-r.left-S.pan.x)/S.zoom, y:(cy-r.top-S.pan.y)/S.zoom}; };
+function zoomAt(cx,cy,f){
+  const r=svg.getBoundingClientRect(), z=Math.min(4,Math.max(.05,S.zoom*f));
+  const k=z/S.zoom;
+  S.pan.x=cx-r.left-(cx-r.left-S.pan.x)*k;
+  S.pan.y=cy-r.top -(cy-r.top -S.pan.y)*k;
+  S.zoom=z; render();
+}
+
+/* ============================================================================
+   POINTER INPUT
+   ========================================================================== */
+const ptrs=new Map();
+let mode=null, start=null, dragIds=null, pinchD=0, moved=false, lastTap=0, tapId=null;
+
+svg.addEventListener('pointerdown',e=>{
+  svg.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===2){ mode='pinch';
+    const [a,b]=[...ptrs.values()]; pinchD=Math.hypot(a.x-b.x,a.y-b.y);
+    start={cx:(a.x+b.x)/2,cy:(a.y+b.y)/2}; return; }
+  moved=false;
+  /* Middle mouse is pan-only, even when the pointer is over a node, wire, or
+     connection handle. Keep it separate from background pan so a stationary
+     middle-click does not clear the current selection. */
+  if(e.button===1){
+    e.preventDefault(); mode='pan-mid';
+    start={x:e.clientX,y:e.clientY,px:S.pan.x,py:S.pan.y}; return;
+  }
+  const w=toWorld(e.clientX,e.clientY);
+  const hPort=e.target.closest('[data-port]');
+  const hNode=e.target.closest('[data-id]');
+  const hEdge=e.target.closest('[data-eid]');
+  const hChev=e.target.classList.contains('chev');
+
+  if(hPort){ mode='connect'; S.connectFrom=hPort.dataset.port; S.connectPt=w; render(); return; }
+  if(hChev&&hNode){ mode='chev'; tapId=hNode.dataset.id; return; }
+  if(hNode){
+    const id=hNode.dataset.id;
+    const now=Date.now();
+    if(tapId===id && now-lastTap<330){ lastTap=0; tapId=null; mode=null; toggleOpen(id); return; }
+    lastTap=now; tapId=id;
+    if(!S.sel.has(id)){ if(!e.shiftKey) S.sel.clear(); S.sel.add(id); }
+    else if(e.shiftKey){ S.sel.delete(id); }
+    S.selEdge=null;
+    mode='drag'; dragIds=[...S.sel].filter(i=>{ const a=ancestors(i); return !a.some(x=>S.sel.has(x)); });
+    start={w, snap:snapshot(), orig:dragIds.map(i=>({id:i,x:byId[i].x,y:byId[i].y}))};
+    render(); return;
+  }
+  if(hEdge){ S.selEdge=hEdge.dataset.eid; S.sel.clear(); mode=null; render(); return; }
+  if(e.shiftKey){ mode='marquee'; S.marquee={x0:w.x,y0:w.y,x1:w.x,y1:w.y}; return; }
+  mode='pan'; start={x:e.clientX,y:e.clientY,px:S.pan.x,py:S.pan.y};
+});
+
+svg.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId)&&mode!=='pinch') return;
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(mode==='pinch'&&ptrs.size>=2){
+    const [a,b]=[...ptrs.values()], d=Math.hypot(a.x-b.x,a.y-b.y);
+    const cx=(a.x+b.x)/2, cy=(a.y+b.y)/2;
+    if(pinchD>0) zoomAt(cx,cy,d/pinchD);
+    S.pan.x+=cx-start.cx; S.pan.y+=cy-start.cy;
+    pinchD=d; start={cx,cy}; render(); return;
+  }
+  moved=true;
+  if(mode==='pan'||mode==='pan-mid'){
+    S.pan.x=start.px+(e.clientX-start.x); S.pan.y=start.py+(e.clientY-start.y);
+    svg.querySelector('#world').setAttribute('transform',
+      `translate(${S.pan.x},${S.pan.y}) scale(${S.zoom})`); return; }
+  if(mode==='drag'){
+    const w=toWorld(e.clientX,e.clientY);
+    const dx=w.x-start.w.x, dy=w.y-start.w.y;
+    start.orig.forEach(o=>{ const n=byId[o.id]; n.x=o.x+dx; n.y=o.y+dy; n.pinned=true; });
+    render(); return; }
+  if(mode==='connect'){ S.connectPt=toWorld(e.clientX,e.clientY); render(); return; }
+  if(mode==='marquee'){ const w=toWorld(e.clientX,e.clientY);
+    S.marquee.x1=w.x; S.marquee.y1=w.y; render(); return; }
+});
+
+function endPtr(e){
+  ptrs.delete(e.pointerId);
+  if(mode==='pinch'){ if(ptrs.size<2){mode=null;} return; }
+  if(mode==='chev'&&!moved){ toggleOpen(tapId); }
+  if(mode==='connect'){
+    const el=document.elementFromPoint(e.clientX,e.clientY);
+    const t=el&&el.closest('[data-id]');
+    const from=S.connectFrom; S.connectFrom=null; S.connectPt=null;
+    if(t&&t.dataset.id!==from) connect(from,t.dataset.id); else render();
+  }
+  if(mode==='drag'&&moved){
+    S.undo.push(start.snap); if(S.undo.length>80)S.undo.shift(); S.redo.length=0;
+    /* Dragging is a manual layout operation. The nodes were pinned continuously in
+       pointermove, so re-running the layered layout here would move every unpinned
+       sibling and its origin-normalisation would also offset the dropped nodes. */
+    clearSizes(); render(); }
+  if(mode==='marquee'){
+    const m=S.marquee, x0=Math.min(m.x0,m.x1),x1=Math.max(m.x0,m.x1),
+          y0=Math.min(m.y0,m.y1),y1=Math.max(m.y0,m.y1);
+    S.marquee=null; if(!e.shiftKey) S.sel.clear();
+    const {groups,leaves}=visibleList();
+    [...leaves,...groups.map(g=>g[0])].forEach(id=>{ const p=drawPos(id),s=sizeOf(id);
+      if(p.x>=x0&&p.y>=y0&&p.x+s.w<=x1&&p.y+s.h<=y1) S.sel.add(id); });
+    render();
+  }
+  if(mode==='pan'&&!moved){ S.sel.clear(); S.selEdge=null; render(); }
+  mode=null;
+}
+svg.addEventListener('pointerup',endPtr);
+svg.addEventListener('pointercancel',endPtr);
+svg.addEventListener('wheel',e=>{ e.preventDefault();
+  if(e.ctrlKey||Math.abs(e.deltaY)>Math.abs(e.deltaX)*2)
+    zoomAt(e.clientX,e.clientY,Math.pow(.999,e.deltaY));
+  else { S.pan.x-=e.deltaX; S.pan.y-=e.deltaY; render(); }
+},{passive:false});
+svg.addEventListener('auxclick',e=>{ if(e.button===1) e.preventDefault(); });
+svg.addEventListener('contextmenu',e=>e.preventDefault());
+/* ============================================================================
+   UI WIRING
+   ========================================================================== */
+const $=s=>document.querySelector(s);
+function setLvlBtn(l){ [...$('#lvlSeg').children].forEach(c=>
+  c.classList.toggle('on', +c.dataset.lvl===l)); }
+
+$('#viewSeg').onclick=e=>{ const b=e.target.closest('[data-view]'); if(!b)return;
+  [...e.currentTarget.children].forEach(c=>c.classList.toggle('on',c===b));
+  S.view=b.dataset.view;
+  render();
+  toast(S.view==='arch'?'component architecture':'runtime tensor flow'); };
+
+$('#variantSeg').onclick=e=>{ const b=e.target.closest('[data-variant]'); if(!b)return;
+  [...e.currentTarget.children].forEach(c=>c.classList.toggle('on',c===b));
+  S.variant=b.dataset.variant;
+  S.sel=new Set([...S.sel].filter(id=>byId[id]&&nodeActive(byId[id])));
+  if(S.selEdge){ const edge=G.edges.find(x=>x.id===S.selEdge);
+    if(!edge||!nodeActive(byId[edge.from])||!nodeActive(byId[edge.to])) S.selEdge=null; }
+  clearSizes(); render();
+  toast(S.variant==='t2v'?'pure T2V base':'image-conditioning overlay'); };
+
+$('#wireSeg').onclick=e=>{ const b=e.target.closest('[data-k]'); if(!b)return;
+  const k=b.dataset.k;
+  if(S.kinds.has(k)){ if(S.kinds.size===1) return toast('keep at least one wire type'); S.kinds.delete(k); }
+  else S.kinds.add(k);
+  b.classList.toggle('on',S.kinds.has(k)); render(); };
+
+$('#lvlSeg').onclick=e=>{ const b=e.target.closest('[data-lvl]'); if(!b)return;
+  [...e.currentTarget.children].forEach(c=>c.classList.toggle('on',c===b));
+  openToLevel(+b.dataset.lvl); };
+
+$('#btnLayout').onclick=()=>{ push(); layoutAll(true); render(); fit(true); toast('re-laid out'); };
+$('#btnDir').onclick=e=>{ push(); S.dir=S.dir==='TB'?'LR':'TB';
+  e.currentTarget.textContent=S.dir==='TB'?'↓ Top-down':'→ Left-right';
+  render(); toast('direction changed — Auto-layout to rearrange'); };
+$('#btnFit').onclick=()=>fit();
+$('#btnUndo').onclick=undo; $('#btnRedo').onclick=redo;
+$('#btnGroup').onclick=groupSel; $('#btnUngroup').onclick=ungroupSel;
+$('#btnAdd').onclick=()=>{ const p=S.sel.size?byId[[...S.sel][0]].parent||null:null; addNode(p); };
+$('#zIn').onclick=()=>{const r=svg.getBoundingClientRect();zoomAt(r.left+r.width/2,r.top+r.height/2,1.25);};
+$('#zOut').onclick=()=>{const r=svg.getBoundingClientRect();zoomAt(r.left+r.width/2,r.top+r.height/2,.8);};
+$('#search').oninput=e=>{ S.search=e.target.value; render(); };
+$('#search').onkeydown=e=>{ if(e.key==='Enter'){ const q=S.search.toLowerCase();
+  const m=G.nodes.find(n=>n.name.toLowerCase().includes(q)||n.id.toLowerCase().includes(q));
+  if(m) focusNode(m.id); else toast('no match'); } };
+
+$('#tree').onclick=e=>{
+  const t=e.target.closest('[data-tog]');
+  if(t&&t.textContent.trim()){ toggleOpen(t.dataset.tog); return; }
+  const r=e.target.closest('[data-tid]'); if(!r) return;
+  const id=r.dataset.tid;
+  if(e.shiftKey) S.sel.has(id)?S.sel.delete(id):S.sel.add(id);
+  else { S.sel=new Set([id]); focusNode(id); return; }
+  S.selEdge=null; render();
+};
+
+/* panels */
+const mobile=()=>window.innerWidth<=900;
+function togglePanel(sel,other){
+  const el=$(sel), willOpen=el.classList.contains('hide');
+  el.classList.toggle('hide',!willOpen);
+  if(mobile()){
+    if(willOpen) $(other).classList.add('hide');
+    $('#scrim').classList.toggle('show',willOpen);
+  }
+  render();
+}
+$('#btnPanels').onclick=()=>togglePanel('#outline','#inspector');
+$('#btnInsp').onclick=()=>togglePanel('#inspector','#outline');
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{
+  $('#'+b.dataset.close).classList.add('hide'); $('#scrim').classList.remove('show'); });
+$('#scrim').onclick=()=>{ $('#outline').classList.add('hide'); $('#inspector').classList.add('hide');
+  $('#scrim').classList.remove('show'); };
+
+/* modal */
+function modal(title,html,foot){
+  $('#modalTitle').textContent=title; $('#modalBody').innerHTML=html;
+  $('#modalFoot').innerHTML=foot||''; $('#modal').classList.add('show');
+}
+$('#modalClose').onclick=()=>$('#modal').classList.remove('show');
+$('#modal').onclick=e=>{ if(e.target.id==='modal') $('#modal').classList.remove('show'); };
+
+$('#btnJson').onclick=()=>{
+  modal('Graph JSON',
+    `<div style="color:var(--dim2);font-size:11.5px;margin-bottom:6px">
+      This is the whole map, including source locations and provenance. Edit it here,
+      export it, or load another graph with the same schema.</div>
+     <textarea id="jsonArea" spellcheck="false">${esc(JSON.stringify(JSON.parse(snapshot()),null,1))}</textarea>`,
+    `<button class="btn" id="jsCopy">Copy</button>
+     <button class="btn" id="jsDl">Download</button>
+     <button class="btn on" id="jsLoad">Load</button>`);
+  $('#jsCopy').onclick=()=>{ $('#jsonArea').select(); document.execCommand('copy'); toast('copied'); };
+  $('#jsDl').onclick=()=>{ const b=new Blob([$('#jsonArea').value],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(b);
+    a.download='ltx25-graph.json'; a.click(); };
+  $('#jsLoad').onclick=()=>{ try{ push(); restore($('#jsonArea').value);
+      S.sel.clear(); S.selEdge=null; render(); fit(true);
+      $('#modal').classList.remove('show'); toast('loaded'); }
+    catch(err){ toast('parse error: '+err.message); } };
+};
+
+$('#btnHelp').onclick=()=>modal('How this works',`
+<h4>Educational depth and code hierarchy</h4>
+<div style="font-size:12.5px;line-height:1.7;color:var(--dim)">
+Depth follows the execution story: inputs and major phases at depth 1, components
+at depth 2, and implementation internals below that. The <b>Architecture</b> view
+shows component wiring without runtime-only pipeline loops. Select any node to use
+its runtime call-site and class-definition links in the inspector; those links are
+the literal Python hierarchy, kept separate so it cannot distort the data-flow map.
+Connections are lifted automatically to the deepest visible level.</div>
+<h4>Navigating</h4>
+<div class="helpgrid">
+<div>click ▶ / double-click</div><div>open one level below</div>
+<div>Depth 1-4 / All</div><div>educational abstraction depth</div>
+<div>T2V / + image</div><div>stable base map with an image-conditioning overlay</div>
+<div>drag background</div><div>pan · wheel or pinch to zoom</div>
+<div>middle-button drag</div><div>pan only, even over nodes and wires</div>
+<div>⇧ + drag background</div><div>marquee select</div>
+<div><kbd>F</kbd></div><div>fit · <kbd>Esc</kbd> deselect</div>
+<div>search + <kbd>⏎</kbd></div><div>reveal a node, opening its ancestors</div>
+</div>
+<h4>Editing</h4>
+<div class="helpgrid">
+<div>drag a node</div><div>move + pin it at the dropped position</div>
+<div>Auto-layout</div><div>the only action that recomputes and unpins all positions</div>
+<div>drag the ◦ handle</div><div>on a selected node, onto another node → connect</div>
+<div>click a wire</div><div>select it; change kind / label / delete</div>
+<div><kbd>A</kbd></div><div>add node · <kbd>Del</kbd> delete</div>
+<div><kbd>G</kbd> / <kbd>⇧G</kbd></div><div>group / ungroup selection</div>
+<div><kbd>Z</kbd> / <kbd>⇧Z</kbd></div><div>undo / redo</div>
+</div>
+<h4>Two views</h4>
+<div style="font-size:12.5px;line-height:1.7;color:var(--dim)">
+<b>Data flow</b> = runtime tensors through the one-stage full/dev BF16 recipe.
+<b>Architecture</b> = component-internal static relationships, while source links
+take you to the literal class and call hierarchy.
+Wire style: solid = tensor, dashed amber = scalar/control influence, dotted =
+loop-carried Euler updates. Tensor-only is the default.<br><br>
+Both views share one arrangement. Switching views or wire classes changes only
+what is rendered; it never moves nodes.</div>
+<h4>Source navigation</h4>
+<div style="font-size:12.5px;line-height:1.7;color:var(--dim)">
+Select a node or wire to see its evidence in the inspector. <b>VS Code</b> opens the
+local checkout at the cited line, <b>GitHub</b> opens the repository version, and
+<b>Copy</b> copies a portable <span class="mono">path:line</span>. The local root and
+GitHub ref live in Graph JSON under <span class="mono">meta</span>. GitHub is disabled
+for the local-only safetensors-header archive.</div>
+<h4>Honesty markers</h4>
+<div style="font-size:12.5px;line-height:1.7;color:var(--dim)">
+Each node carries a provenance dot — green means directly supported by the current
+Python implementation or the saved LTX-2.5 safetensors headers; amber means a
+readability-oriented semantic aggregation; hollow means unverified. This built-in
+map scopes itself to the full/dev BF16 one-stage path named in Graph JSON.</div>
+`,'<button class="btn on" onclick="document.getElementById(\'modal\').classList.remove(\'show\')">Got it</button>');
+
+/* keyboard */
+addEventListener('keydown',e=>{
+  const t=e.target.tagName;
+  if(t==='INPUT'||t==='TEXTAREA'||t==='SELECT'){ if(e.key==='Escape') e.target.blur(); return; }
+  const k=e.key.toLowerCase();
+  if(k==='delete'||k==='backspace'){ e.preventDefault(); deleteSel(); }
+  else if(k==='g'){ e.preventDefault(); e.shiftKey?ungroupSel():groupSel(); }
+  else if(k==='a'){ const p=S.sel.size?byId[[...S.sel][0]].parent||null:null; addNode(p); }
+  else if(k==='f'){ fit(); }
+  else if(k==='z'){ e.shiftKey?redo():undo(); }
+  else if(k==='escape'){ S.sel.clear(); S.selEdge=null; render(); }
+  else if(k==='enter'&&S.sel.size===1){ toggleOpen([...S.sel][0]); }
+  else if('1234'.includes(k)){ setLvlBtn(+k); openToLevel(+k); }
+  else if(k==='0'){ setLvlBtn(99); openToLevel(99); }
+});
+addEventListener('resize',()=>render());
+
+/* ---------------- boot ---------------- */
+if(mobile()){ $('#outline').classList.add('hide'); $('#inspector').classList.add('hide'); }
+buildEducationalGraph();
+G.nodes.forEach(n=>{ n.open=false; });
+/* Lay out the superset once so recipe switches only reveal/hide nodes and never
+   rearrange the graph. The visible default is then restored to pure T2V. */
+S.variant='image';
+layoutAll(true);
+S.variant='t2v';
+render();
+setTimeout(()=>fit(true),0);
+</script>
+</body>
+</html>

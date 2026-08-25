@@ -1,2 +1,2 @@
 # mlearn
-Max Learning Machine Learning
+Machine Learning Reference
