@@ -31,3 +31,8 @@
 
 #### [Tuesday 28.07.26] Zero-initialize convolutional layers
 - Looked at why the last layer on vector prediction networks is often zero-initialized.
+
+...
+
+
+#### [Sunday 18.01.2026] Attention is all we need
