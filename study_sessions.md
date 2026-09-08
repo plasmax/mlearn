@@ -4,6 +4,7 @@
 - [FixAnything](https://fix-anything.github.io/) - Wan I2V conditioned on point clouds & gaussians to produce new camera moves
 
 ## Past
+#### [Tuesday 08.09.26] Comparing LTX 2.5 Conv Decoder to Diffusion decoder
 
 #### [Wednesday 02.09.26] PiD paper review, Vista4D, LTX 2.5 diffusion decoder
 - Reviewed [Pixel Diffusion paper](https://arxiv.org/abs/2605.23902) from Nvidia
