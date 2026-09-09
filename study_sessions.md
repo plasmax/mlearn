@@ -5,6 +5,8 @@
 
 ## Past
 #### [Tuesday 08.09.26] Comparing LTX 2.5 Conv Decoder to Diffusion decoder
+- Compared VAE roundtrips using CG input. Conv creates artifacts, diffusion overly smoothes.
+- Afterwards: GPT-6 Astra runpod experiment: set up LTX 2.5 decoder example notebooks.
 
 #### [Wednesday 02.09.26] PiD paper review, Vista4D, LTX 2.5 diffusion decoder
 - Reviewed [Pixel Diffusion paper](https://arxiv.org/abs/2605.23902) from Nvidia
