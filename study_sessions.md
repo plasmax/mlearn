@@ -1,6 +1,5 @@
 ## Upcoming
 
-- Comparing LTX 2.5 Diffusion Decoder to its Convolutional Decoder in both results & code
 - [FixAnything](https://fix-anything.github.io/) - Wan I2V conditioned on point clouds & gaussians to produce new camera moves
 
 ## Past
