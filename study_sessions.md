@@ -1,8 +1,18 @@
 ## Upcoming
 
-- [FixAnything](https://fix-anything.github.io/) - Wan I2V conditioned on point clouds & gaussians to produce new camera moves
+- KL Divergence
+- LTX Architecture (round 2, manually assembled)
+- [CS231n: Deep Learning for Computer Vision](https://cs231n.stanford.edu/)
 
 ## Past
+#### [Tuesday 29.09.26] RLHF, Direct Preference Optimization and Flow-DPO
+- Looked at how DPO differs from RLHF, removing the reward model and replacing it with a loss function that contrasts preference pair outputs.
+- Colab from Astra, looking at applying Flow-DPO to a simple MNIST-based unconditional generative model to train it to produce a specific character.
+
+#### [Tuesday 15.09.26] FixAnything camera control using point clouds and gaussians
+- [FixAnything](https://fix-anything.github.io/) - Wan I2V conditioned on point clouds & gaussians to produce new camera moves
+- Looked at Astra inference examples - Max's repo [here](https://github.com/plasmax/fix-anything/tree/bake_prompt)
+
 #### [Tuesday 08.09.26] Comparing LTX 2.5 Conv Decoder to Diffusion decoder
 - Compared VAE roundtrips using CG input. Conv creates artifacts, diffusion overly smoothes.
 - Afterwards: GPT-6 Astra runpod experiment: set up LTX 2.5 decoder example notebooks.
