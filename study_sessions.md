@@ -1,5 +1,7 @@
 ## Upcoming
 
+- Autoregressive video models e.g. [Inspatio-World](https://github.com/inspatio/inspatio-world-v1.5)
+
 - KL Divergence
 - LTX Architecture (round 2, manually assembled)
 - [CS231n: Deep Learning for Computer Vision](https://cs231n.stanford.edu/)
