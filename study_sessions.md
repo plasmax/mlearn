@@ -1,12 +1,14 @@
 ## Upcoming
 
 - Autoregressive video models e.g. [Inspatio-World](https://github.com/inspatio/inspatio-world-v1.5)
-
-- KL Divergence
+- Continuous Probability Distributions, Probability Density Functions
 - LTX Architecture (round 2, manually assembled)
 - [CS231n: Deep Learning for Computer Vision](https://cs231n.stanford.edu/)
 
 ## Past
+#### [Tuesday 06.10.26] Surprise, Entropy, Cross-Entropy & KL Divergence in Discrete Probability Distributions
+- Worked on pen-and-paper examples of simple discrete probability distributions
+
 #### [Tuesday 29.09.26] RLHF, Direct Preference Optimization and Flow-DPO
 - Looked at how DPO differs from RLHF, removing the reward model and replacing it with a loss function that contrasts preference pair outputs.
 - Colab from Astra, looking at applying Flow-DPO to a simple MNIST-based unconditional generative model to train it to produce a specific character.
