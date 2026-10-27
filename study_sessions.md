@@ -6,6 +6,14 @@
 - [CS231n: Deep Learning for Computer Vision](https://cs231n.stanford.edu/)
 
 ## Past
+#### [Tuesday 20.10.26] Bayesian Probability
+- Set theory
+- Conditional probabilities
+- Bayes' Theorem
+- Intersections and Unions
+- Venn diagrams
+- Decision trees
+  
 #### [Tuesday 06.10.26] Surprise, Entropy, Cross-Entropy & KL Divergence in Discrete Probability Distributions
 - Worked on pen-and-paper examples of simple discrete probability distributions
 
